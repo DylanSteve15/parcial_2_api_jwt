@@ -12,12 +12,17 @@ logging.basicConfig(level=logging.INFO)
 # Cargar variables de entorno desde .env
 load_dotenv()
 
-# URIs de base de datos
-RAILWAY_DB_URI = os.getenv('RAILWAY_DB_URI')  # Ejemplo: mysql+pymysql://user:pass@host/db
+# Leer variables
+RAILWAY_DB_URI = os.getenv('RAILWAY_DB_URI') or os.getenv('DATABASE_URL')  # Compatibilidad con Railway
 SQLITE_URI = 'sqlite:///horarios_local.db'
+
+# Corregir prefijo de PostgreSQL si es necesario
+if RAILWAY_DB_URI and RAILWAY_DB_URI.startswith("postgres://"):
+    RAILWAY_DB_URI = RAILWAY_DB_URI.replace("postgres://", "postgresql://")
 
 # Crear instancia de Base
 Base = declarative_base()
+
 
 def get_engine():
     """
@@ -27,9 +32,10 @@ def get_engine():
     if RAILWAY_DB_URI:
         try:
             engine = create_engine(RAILWAY_DB_URI, echo=False)
+            # Probar conexión
             conn = engine.connect()
             conn.close()
-            logging.info('✅ Conexión a Railway exitosa.')
+            logging.info('✅ Conexión a Railway/PostgreSQL exitosa.')
             return engine
         except OperationalError:
             logging.warning('⚠️ No se pudo conectar a Railway. Usando SQLite local.')
@@ -37,9 +43,11 @@ def get_engine():
     logging.info('🗄️ Usando base de datos local SQLite.')
     return create_engine(SQLITE_URI, echo=False)
 
+
 # Crear motor y sesión
 engine = get_engine()
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
 
 def init_db():
     """
@@ -49,6 +57,7 @@ def init_db():
     import models.horario_model
     Base.metadata.create_all(bind=engine)
     logging.info('📦 Tablas creadas o verificadas correctamente.')
+
 
 def get_db_session():
     """
