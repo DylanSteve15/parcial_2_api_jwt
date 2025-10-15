@@ -1,78 +1,56 @@
-# main.py
-# Punto de entrada principal de la API Flask para gestión de usuarios y horarios
-
-from flask import Flask, jsonify
-from flask_cors import CORS
-from config.database import init_db
-from controllers.user_controller import user_bp
+from models.db import Base
+from config.database import engine
+from flask import Flask, send_from_directory
+from config.jwt import *
+from controllers.user_controller import user_bp, register_jwt_error_handlers
 from controllers.horario_controller import horario_bp
+from flask_jwt_extended import JWTManager
+from dotenv import load_dotenv
 import os
+import secrets
+import logging
 
-def create_app():
-    """
-    Crea e inicializa la aplicación Flask.
-    Configura la base de datos, CORS y los controladores (blueprints).
-    """
-    app = Flask(__name__)
+# Configurar logs
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-    # ==============================
-    # CONFIGURACIÓN GENERAL
-    # ==============================
-    app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'clave_super_secreta')
-    app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///horarios_local.db')
-    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+# Verifica y crea .env si no existe
+if not os.path.exists('.env'):
+    logger.info("Creando archivo .env con configuración predeterminada...")
+    with open('.env', 'w') as f:
+        f.write(f"JWT_SECRET_KEY={secrets.token_hex(32)}\n")
+        f.write("MYSQL_URI=sqlite:///horarios_local.db\n")  # Base local por defecto
+    logger.info("Archivo .env creado. Reinicia la app para cargar cambios.")
+    load_dotenv()
 
-    # ==============================
-    # CONFIGURAR CORS
-    # ==============================
-    CORS(app, resources={r"/api/*": {"origins": "*"}})
+# Cargar variables de entorno
+load_dotenv()
 
-    # ==============================
-    # INICIALIZAR BASE DE DATOS
-    # ==============================
-    init_db(app)
+app = Flask(__name__, static_folder='static')
 
-    # ==============================
-    # REGISTRAR BLUEPRINTS (RUTAS)
-    # ==============================
-    app.register_blueprint(user_bp, url_prefix="/api/users")
-    app.register_blueprint(horario_bp, url_prefix="/api/horarios")
+# Configuración del JWT
+app.config['JWT_SECRET_KEY'] = JWT_SECRET_KEY
+app.config['JWT_TOKEN_LOCATION'] = JWT_TOKEN_LOCATION
+app.config['JWT_ACCESS_TOKEN_EXPIRES'] = JWT_ACCESS_TOKEN_EXPIRES
+app.config['JWT_HEADER_NAME'] = JWT_HEADER_NAME
+app.config['JWT_HEADER_TYPE'] = JWT_HEADER_TYPE
 
-    # ==============================
-    # RUTA DE PRUEBA / STATUS
-    # ==============================
-    @app.route("/api", methods=["GET"])
-    def index():
-        """
-        Ruta base para verificar el estado de la API.
-        """
-        return jsonify({
-            "status": "ok",
-            "message": "API Flask Horarios funcionando correctamente 🚀"
-        }), 200
+jwt = JWTManager(app)
 
-    # ==============================
-    # MANEJADORES DE ERRORES GLOBALES
-    # ==============================
-    @app.errorhandler(404)
-    def not_found_error(e):
-        return jsonify({"error": "Ruta no encontrada"}), 404
+# Registrar Blueprints
+app.register_blueprint(user_bp, url_prefix='/api')
+app.register_blueprint(horario_bp, url_prefix='/api')
 
-    @app.errorhandler(500)
-    def internal_error(e):
-        return jsonify({"error": "Error interno del servidor"}), 500
+# Registrar manejo de errores JWT
+register_jwt_error_handlers(app)
 
-    return app
+# Ruta principal
+@app.route('/')
+def index():
+    return send_from_directory('static', 'index.html')
 
-
+# Inicializar la base de datos
 if __name__ == "__main__":
-    # Crear e iniciar la aplicación
-    app = create_app()
-
-    # Puerto y modo debug configurables por entorno
-    port = int(os.getenv("PORT", 5000))
-    debug_mode = os.getenv("FLASK_ENV", "development") == "development"
-
-    print(f"\n🚀 Servidor Flask iniciado en http://127.0.0.1:{port}/api\n")
-
-    app.run(host="0.0.0.0", port=port, debug=debug_mode)
+    Base.metadata.create_all(engine)
+    logger.info("Tablas creadas correctamente.")
+    app.run(debug=True)

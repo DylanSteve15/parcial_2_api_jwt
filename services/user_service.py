@@ -1,102 +1,53 @@
-#
 import logging
-from typing import List, Optional
-from models.user_model import User
-from repositories.user_repository import UserRepository
-from werkzeug.security import generate_password_hash, check_password_hash
+from repositories.horario_repository import HorarioRepository
+from sqlalchemy.orm import Session
 
 # Configuración del logger
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-
-class UserService:
+class HorarioService:
     """
-    Servicio que gestiona la lógica de negocio relacionada con los usuarios.
-    Se encarga de orquestar la comunicación entre controladores y repositorios,
-    aplicando validaciones, reglas y transformaciones de datos.
+    Servicio de lógica de negocio para la gestión de horarios.
+    Interactúa con el repositorio de horarios.
     """
+    def __init__(self, db_session: Session):
+        self.repository = HorarioRepository(db_session)
+        logger.info("Servicio de horarios inicializado correctamente")
 
-    def __init__(self, user_repository: UserRepository):
-        """
-        Inicializa el servicio con una instancia del repositorio de usuarios.
-        """
-        self.user_repository = user_repository
+    def get_all_horarios(self):
+        """Devuelve todos los horarios registrados."""
+        logger.info("Listando todos los horarios")
+        return self.repository.get_all_horarios()
 
-    # ---------------------------------------------------------------------
-    # Métodos de negocio
-    # ---------------------------------------------------------------------
+    def get_horario_by_id(self, horario_id: int):
+        """Obtiene un horario específico por su ID."""
+        logger.info(f"Consultando horario con ID: {horario_id}")
+        return self.repository.get_horario_by_id(horario_id)
 
-    def listar_usuarios(self) -> List[User]:
-        """
-        Devuelve la lista de todos los usuarios registrados.
-        """
-        logger.info("Listando todos los usuarios registrados...")
-        return self.user_repository.get_all_users()
+    def create_horario(self, materia: str, dia: str, hora_inicio: str, hora_fin: str, aula: str):
+        """Crea un nuevo horario validando los datos requeridos."""
+        logger.info(f"Creando nuevo horario para la materia: {materia}")
+        if not all([materia, dia, hora_inicio, hora_fin, aula]):
+            logger.warning("Intento de creación de horario con datos incompletos")
+            raise ValueError("Todos los campos (materia, día, hora inicio, hora fin y aula) son obligatorios.")
+        return self.repository.create_horario(materia, dia, hora_inicio, hora_fin, aula)
 
-    def obtener_usuario_por_id(self, user_id: int) -> Optional[User]:
-        """
-        Devuelve un usuario específico por su ID.
-        """
-        logger.info(f"Obteniendo usuario con ID {user_id}...")
-        return self.user_repository.get_user_by_id(user_id)
+    def update_horario(self, horario_id: int, materia: str = None, dia: str = None,
+                       hora_inicio: str = None, hora_fin: str = None, aula: str = None):
+        """Actualiza un horario existente."""
+        logger.info(f"Actualizando horario con ID: {horario_id}")
+        horario = self.repository.update_horario(horario_id, materia, dia, hora_inicio, hora_fin, aula)
+        if not horario:
+            logger.warning(f"No se encontró el horario con ID {horario_id} para actualizar")
+            raise ValueError("Horario no encontrado.")
+        return horario
 
-    def crear_usuario(self, username: str, password: str) -> Optional[User]:
-        """
-        Registra un nuevo usuario después de validar que no exista el mismo username.
-        La contraseña se almacena de forma encriptada.
-        """
-        logger.info(f"Intentando crear usuario '{username}'...")
-
-        # Validar si el usuario ya existe
-        existing_user = self.user_repository.get_user_by_username(username)
-        if existing_user:
-            logger.warning(f"El nombre de usuario '{username}' ya existe.")
-            return None
-
-        # Encriptar la contraseña antes de guardarla
-        hashed_password = generate_password_hash(password)
-        logger.info(f"Contraseña encriptada para el usuario '{username}'")
-
-        return self.user_repository.create_user(username=username, password=hashed_password)
-
-    def autenticar_usuario(self, username: str, password: str) -> Optional[User]:
-        """
-        Verifica las credenciales del usuario.
-        Si son correctas, devuelve la instancia del usuario.
-        """
-        logger.info(f"Autenticando usuario '{username}'...")
-        user = self.user_repository.get_user_by_username(username)
-
-        if not user:
-            logger.warning(f"Usuario '{username}' no encontrado.")
-            return None
-
-        if check_password_hash(user.password, password):
-            logger.info(f"Usuario '{username}' autenticado correctamente.")
-            return user
-
-        logger.warning("Contraseña incorrecta.")
-        return None
-
-    def actualizar_usuario(
-        self, user_id: int, username: Optional[str] = None, password: Optional[str] = None
-    ) -> Optional[User]:
-        """
-        Actualiza los datos de un usuario, encriptando la nueva contraseña si se modifica.
-        """
-        logger.info(f"Actualizando usuario con ID {user_id}...")
-
-        hashed_password = None
-        if password:
-            hashed_password = generate_password_hash(password)
-            logger.info(f"Nueva contraseña encriptada para el usuario ID {user_id}")
-
-        return self.user_repository.update_user(user_id, username=username, password=hashed_password)
-
-    def eliminar_usuario(self, user_id: int) -> bool:
-        """
-        Elimina un usuario por su ID.
-        """
-        logger.info(f"Intentando eliminar usuario con ID {user_id}...")
-        return self.user_repository.delete_user(user_id)
+    def delete_horario(self, horario_id: int):
+        """Elimina un horario de la base de datos."""
+        logger.info(f"Eliminando horario con ID: {horario_id}")
+        horario = self.repository.delete_horario(horario_id)
+        if not horario:
+            logger.warning(f"No se encontró el horario con ID {horario_id} para eliminar")
+            raise ValueError("Horario no encontrado.")
+        return horario

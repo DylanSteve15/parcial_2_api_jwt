@@ -24,3 +24,4 @@ gunicorn==21.2.0
 # Manejo de CORS (opcional pero recomendado para frontends)
 Flask-Cors==4.0.0
 
+bcrypt==4.1.2
