@@ -1,57 +1,54 @@
-# config/database.py
 import os
 import logging
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy.orm import sessionmaker
 from sqlalchemy.exc import OperationalError
 from dotenv import load_dotenv
+from models import Base  # Importa la base declarativa de tus modelos
 
-# Configurar logs
+# Configurar logging
 logging.basicConfig(level=logging.INFO)
 
-# Cargar variables de entorno desde .env
+# Cargar variables del entorno (.env)
 load_dotenv()
 
-# URIs de base de datos
-RAILWAY_DB_URI = os.getenv('RAILWAY_DB_URI')  # Ejemplo: mysql+pymysql://user:pass@host/db
-SQLITE_URI = 'sqlite:///horarios_local.db'
-
-# Crear instancia de Base
-Base = declarative_base()
+# URI principal y de respaldo
+MYSQL_URI = os.getenv("MYSQL_URI")  # Ejemplo: mysql+pymysql://user:password@host/db
+SQLITE_URI = "sqlite:///horarios_local.db"
 
 def get_engine():
     """
-    Intenta conectar a Railway (si existe variable de entorno). 
-    Si falla, usa SQLite local como respaldo.
+    Intenta crear una conexión con MySQL.
+    Si falla, usa SQLite como respaldo local.
     """
-    if RAILWAY_DB_URI:
+    if MYSQL_URI:
         try:
-            engine = create_engine(RAILWAY_DB_URI, echo=False)
+            engine = create_engine(MYSQL_URI, echo=True)
+            # Prueba de conexión
             conn = engine.connect()
             conn.close()
-            logging.info('✅ Conexión a Railway exitosa.')
+            logging.info("✅ Conexión a MySQL exitosa.")
             return engine
         except OperationalError:
-            logging.warning('⚠️ No se pudo conectar a Railway. Usando SQLite local.')
-
-    logging.info('🗄️ Usando base de datos local SQLite.')
-    return create_engine(SQLITE_URI, echo=False)
+            logging.warning("⚠️ No se pudo conectar a MySQL. Usando SQLite local.")
+    # Si MySQL falla o no existe, usa SQLite
+    engine = create_engine(SQLITE_URI, echo=True)
+    return engine
 
 # Crear motor y sesión
 engine = get_engine()
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-def init_db():
-    """
-    Crea todas las tablas definidas en los modelos.
-    """
-    import models.user_model
-    import models.horario_model
-    Base.metadata.create_all(bind=engine)
-    logging.info('📦 Tablas creadas o verificadas correctamente.')
+# Crear las tablas definidas en los modelos (si no existen)
+Base.metadata.create_all(bind=engine)
 
 def get_db_session():
     """
-    Retorna una sesión lista para usar en controladores o servicios.
+    Retorna una nueva sesión de base de datos.
+    Se usa dentro de los servicios o controladores.
     """
-    return SessionLocal()
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()

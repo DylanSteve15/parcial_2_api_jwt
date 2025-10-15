@@ -1,30 +1,36 @@
-# models/horario_model.py
 import logging
-from sqlalchemy import Column, Integer, String, ForeignKey, Time, Date
-from sqlalchemy.orm import relationship
-from config.database import Base
+from sqlalchemy import Column, Integer, String, Time, Date
+from models.db import Base
 
-# Configurar logger
+# Configuración de logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class Horario(Base):
     """
-    Modelo que representa los horarios registrados por los usuarios.
-    Cada horario pertenece a un usuario específico.
+    Modelo de la tabla 'horarios' para el sistema de gestión de horarios.
     """
-    __tablename__ = "horarios"
+    __tablename__ = 'horarios'
 
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    materia = Column(String(255), nullable=False)
+    docente = Column(String(255), nullable=False)
+    dia = Column(String(50), nullable=False)
+    hora_inicio = Column(Time, nullable=False)
+    hora_fin = Column(Time, nullable=False)
+    salon = Column(String(100), nullable=True)
 
-    dia = Column(String(20), nullable=False)          # Ejemplo: 'Lunes', 'Martes', etc.
-    hora_inicio = Column(Time, nullable=False)        # Ejemplo: 08:00:00
-    hora_fin = Column(Time, nullable=False)           # Ejemplo: 12:00:00
-    actividad = Column(String(100), nullable=False)   # Ejemplo: 'Clase de programación', 'Reunión'
-
-    # Relación inversa
-    usuario = relationship("User", back_populates="horarios")
+    def __init__(self, materia, docente, dia, hora_inicio, hora_fin, salon=None):
+        self.materia = materia
+        self.docente = docente
+        self.dia = dia
+        self.hora_inicio = hora_inicio
+        self.hora_fin = hora_fin
+        self.salon = salon
 
     def __repr__(self):
-        return f"<Horario(dia={self.dia}, actividad={self.actividad}, usuario_id={self.user_id})>"
+        return (
+            f"<Horario(id={self.id}, materia='{self.materia}', docente='{self.docente}', "
+            f"dia='{self.dia}', hora_inicio='{self.hora_inicio}', hora_fin='{self.hora_fin}', "
+            f"salon='{self.salon}')>"
+        )

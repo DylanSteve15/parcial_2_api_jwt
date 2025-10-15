@@ -1,101 +1,93 @@
-# repositories/horario_repository.py
-
 import logging
 from sqlalchemy.orm import Session
 from models.horario_model import Horario
+from dateutil import parser
 
-# Configurar logger
+# Configuración de logs
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class HorarioRepository:
     """
-    Repositorio para la gestión de los horarios en la base de datos.
-    Permite crear, consultar, actualizar y eliminar horarios, así como filtrar por usuario.
+    Repositorio encargado de manejar las operaciones CRUD del modelo Horario.
     """
-
     def __init__(self, db_session: Session):
         self.db = db_session
 
-    # -------------------- 🔍 READ --------------------
     def get_all_horarios(self):
-        """
-        Retorna todos los horarios existentes en la base de datos.
-        Ideal para listados administrativos o de depuración.
-        """
-        logger.info("Obteniendo todos los horarios.")
+        """Obtiene todos los registros de horarios."""
+        logger.info("Obteniendo todos los horarios desde el repositorio.")
         return self.db.query(Horario).all()
 
-    def get_horarios_by_user(self, user_id: int):
-        """
-        Retorna todos los horarios asociados a un usuario específico.
-        Esto permite mostrar al usuario logueado únicamente sus horarios.
-        """
-        logger.info(f"Obteniendo horarios del usuario con ID: {user_id}")
-        return self.db.query(Horario).filter(Horario.user_id == user_id).all()
-
     def get_horario_by_id(self, horario_id: int):
-        """
-        Retorna un horario específico según su ID.
-        """
+        """Busca un horario específico por su ID."""
         logger.info(f"Buscando horario por ID: {horario_id}")
         return self.db.query(Horario).filter(Horario.id == horario_id).first()
 
-    # -------------------- ✏️ CREATE --------------------
-    def create_horario(self, user_id: int, dia: str, hora_inicio, hora_fin, actividad: str):
+    def create_horario(self, materia: str, dia: str, hora_inicio: str, hora_fin: str, aula: str):
         """
-        Crea y guarda un nuevo horario en la base de datos.
-        Los campos de hora deben ser objetos datetime.time o cadenas en formato HH:MM:SS.
+        Crea un nuevo horario en la base de datos.
+        Convierte las horas de texto a formato datetime si es necesario.
         """
-        logger.info(f"Creando nuevo horario para usuario {user_id}: {actividad} ({dia})")
+        logger.info(f"Creando horario para la materia: {materia}")
+        try:
+            hora_inicio_parsed = parser.parse(hora_inicio).time()
+            hora_fin_parsed = parser.parse(hora_fin).time()
+        except Exception:
+            logger.warning("Error al convertir las horas, se almacenarán como texto.")
+            hora_inicio_parsed = hora_inicio
+            hora_fin_parsed = hora_fin
+
         nuevo_horario = Horario(
-            user_id=user_id,
+            materia=materia,
             dia=dia,
-            hora_inicio=hora_inicio,
-            hora_fin=hora_fin,
-            actividad=actividad
+            hora_inicio=hora_inicio_parsed,
+            hora_fin=hora_fin_parsed,
+            aula=aula
         )
         self.db.add(nuevo_horario)
         self.db.commit()
         self.db.refresh(nuevo_horario)
+        logger.info(f"Horario creado correctamente con ID: {nuevo_horario.id}")
         return nuevo_horario
 
-    # -------------------- 🧩 UPDATE --------------------
-    def update_horario(self, horario_id: int, dia: str = None, hora_inicio=None, hora_fin=None, actividad: str = None):
-        """
-        Actualiza los datos de un horario existente.
-        Solo actualiza los campos que se proporcionen.
-        """
+    def update_horario(self, horario_id: int, materia: str = None, dia: str = None,
+                       hora_inicio: str = None, hora_fin: str = None, aula: str = None):
+        """Actualiza un horario existente en la base de datos."""
         horario = self.get_horario_by_id(horario_id)
-        if not horario:
-            logger.warning(f"Horario con ID {horario_id} no encontrado.")
-            return None
+        if horario:
+            logger.info(f"Actualizando horario con ID: {horario_id}")
+            if materia:
+                horario.materia = materia
+            if dia:
+                horario.dia = dia
+            if hora_inicio:
+                try:
+                    horario.hora_inicio = parser.parse(hora_inicio).time()
+                except Exception:
+                    horario.hora_inicio = hora_inicio
+            if hora_fin:
+                try:
+                    horario.hora_fin = parser.parse(hora_fin).time()
+                except Exception:
+                    horario.hora_fin = hora_fin
+            if aula:
+                horario.aula = aula
+            self.db.commit()
+            self.db.refresh(horario)
+            logger.info(f"Horario actualizado correctamente: {horario_id}")
+            return horario
+        logger.warning(f"Horario no encontrado para actualizar: {horario_id}")
+        return None
 
-        logger.info(f"Actualizando horario ID {horario_id}.")
-        if dia:
-            horario.dia = dia
-        if hora_inicio:
-            horario.hora_inicio = hora_inicio
-        if hora_fin:
-            horario.hora_fin = hora_fin
-        if actividad:
-            horario.actividad = actividad
-
-        self.db.commit()
-        self.db.refresh(horario)
-        return horario
-
-    # -------------------- ❌ DELETE --------------------
     def delete_horario(self, horario_id: int):
-        """
-        Elimina un horario por su identificador único.
-        """
+        """Elimina un horario de la base de datos."""
         horario = self.get_horario_by_id(horario_id)
-        if not horario:
-            logger.warning(f"Horario con ID {horario_id} no encontrado para eliminar.")
-            return None
-
-        logger.info(f"Eliminando horario ID {horario_id}.")
-        self.db.delete(horario)
-        self.db.commit()
-        return horario
+        if horario:
+            logger.info(f"Eliminando horario con ID: {horario_id}")
+            self.db.delete(horario)
+            self.db.commit()
+            logger.info(f"Horario eliminado correctamente: {horario_id}")
+            return horario
+        logger.warning(f"Horario no encontrado para eliminar: {horario_id}")
+        return None

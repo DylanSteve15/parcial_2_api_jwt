@@ -1,135 +1,85 @@
 import logging
-from typing import List, Optional
 from sqlalchemy.orm import Session
-from sqlalchemy.exc import SQLAlchemyError
 from models.user_model import User
+import bcrypt
 
-# Configuración del logger
+# Configuración de logs
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-
 class UserRepository:
     """
-    Repositorio responsable de gestionar las operaciones CRUD sobre el modelo User.
+    Repositorio para gestionar las operaciones CRUD del modelo User.
     """
-
     def __init__(self, db_session: Session):
-        """
-        Inicializa el repositorio con una sesión de base de datos.
-        """
         self.db = db_session
 
-    # ---------------------------------------------------------------------
-    # Métodos CRUD
-    # ---------------------------------------------------------------------
+    def get_all_users(self):
+        logger.info("Obteniendo todos los usuarios desde el repositorio.")
+        return self.db.query(User).all()
 
-    def get_all_users(self) -> List[User]:
-        """
-        Recupera todos los usuarios de la base de datos.
-        :return: Lista de instancias User.
-        """
-        logger.info("Obteniendo todos los usuarios desde la base de datos...")
-        try:
-            users = self.db.query(User).all()
-            logger.info(f"{len(users)} usuarios encontrados.")
-            return users
-        except SQLAlchemyError as e:
-            logger.error(f"Error al obtener usuarios: {e}")
-            return []
+    def get_user_by_id(self, user_id: int):
+        logger.info(f"Buscando usuario por ID: {user_id}")
+        return self.db.query(User).filter(User.id == user_id).first()
 
-    def get_user_by_id(self, user_id: int) -> Optional[User]:
-        """
-        Busca un usuario por su ID.
-        :param user_id: ID del usuario a buscar.
-        :return: Instancia de User si existe, o None.
-        """
-        logger.info(f"Buscando usuario con ID: {user_id}")
-        try:
-            return self.db.query(User).filter(User.id == user_id).first()
-        except SQLAlchemyError as e:
-            logger.error(f"Error al buscar usuario por ID: {e}")
-            return None
+    def get_user_by_email(self, email: str):
+        logger.info(f"Buscando usuario por email: {email}")
+        return self.db.query(User).filter(User.email == email).first()
 
-    def get_user_by_username(self, username: str) -> Optional[User]:
-        """
-        Busca un usuario por su nombre de usuario.
-        :param username: Nombre de usuario.
-        :return: Instancia de User si existe, o None.
-        """
-        logger.info(f"Buscando usuario con nombre: {username}")
-        try:
-            return self.db.query(User).filter(User.username == username).first()
-        except SQLAlchemyError as e:
-            logger.error(f"Error al buscar usuario por nombre: {e}")
-            return None
+    def count_admins(self):
+        """Cuenta el número de administradores registrados."""
+        count = self.db.query(User).filter(User.role == 'admin').count()
+        logger.info(f"Número de administradores encontrados: {count}")
+        return count
 
-    def create_user(self, username: str, password: str) -> Optional[User]:
-        """
-        Crea un nuevo usuario y lo almacena en la base de datos.
-        :param username: Nombre del usuario.
-        :param password: Contraseña (hash).
-        :return: El usuario creado o None si ocurre un error.
-        """
-        logger.info(f"Creando nuevo usuario: {username}")
-        try:
-            new_user = User(username=username, password=password)
-            self.db.add(new_user)
-            self.db.commit()
-            self.db.refresh(new_user)
-            logger.info(f"Usuario '{username}' creado con ID {new_user.id}")
-            return new_user
-        except SQLAlchemyError as e:
-            logger.error(f"Error al crear usuario: {e}")
-            self.db.rollback()
-            return None
+    def create_user(self, email: str, password: str, role: str = 'user'):
+        logger.info(f"Creando nuevo usuario: {email}")
+        hashed = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+        new_user = User(email=email, password=hashed.decode('utf-8'), role=role)
+        self.db.add(new_user)
+        self.db.commit()
+        self.db.refresh(new_user)
+        logger.info(f"Usuario creado con ID: {new_user.id}")
+        return new_user
 
-    def update_user(
-        self, user_id: int, username: Optional[str] = None, password: Optional[str] = None
-    ) -> Optional[User]:
+    def authenticate(self, email: str, password: str):
         """
-        Actualiza la información de un usuario.
-        :param user_id: ID del usuario a actualizar.
-        :param username: Nuevo nombre (opcional).
-        :param password: Nueva contraseña (opcional).
-        :return: Usuario actualizado o None.
+        Verifica las credenciales del usuario.
+        Retorna el objeto User si la autenticación es exitosa, de lo contrario None.
         """
+        logger.info(f"Intentando autenticar usuario: {email}")
+        user = self.get_user_by_email(email)
+        if user and bcrypt.checkpw(password.encode('utf-8'), user.password.encode('utf-8')):
+            logger.info(f"Autenticación exitosa para el usuario: {email}")
+            return user
+        logger.warning(f"Fallo en la autenticación del usuario: {email}")
+        return None
+
+    def update_user(self, user_id: int, email: str = None, password: str = None, role: str = None):
         user = self.get_user_by_id(user_id)
-        if not user:
-            logger.warning(f"No se encontró usuario con ID {user_id} para actualizar.")
-            return None
-
-        try:
-            if username:
-                user.username = username
+        if user:
+            logger.info(f"Actualizando usuario con ID: {user_id}")
+            if email:
+                user.email = email
             if password:
-                user.password = password
+                hashed = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+                user.password = hashed.decode('utf-8')
+            if role:
+                user.role = role
             self.db.commit()
             self.db.refresh(user)
-            logger.info(f"Usuario {user_id} actualizado correctamente.")
+            logger.info(f"Usuario actualizado correctamente: {user_id}")
             return user
-        except SQLAlchemyError as e:
-            logger.error(f"Error al actualizar usuario: {e}")
-            self.db.rollback()
-            return None
+        logger.warning(f"Usuario no encontrado para actualizar: {user_id}")
+        return None
 
-    def delete_user(self, user_id: int) -> bool:
-        """
-        Elimina un usuario por su ID.
-        :param user_id: ID del usuario a eliminar.
-        :return: True si se eliminó, False si no existe o ocurrió un error.
-        """
+    def delete_user(self, user_id: int):
         user = self.get_user_by_id(user_id)
-        if not user:
-            logger.warning(f"No se encontró usuario con ID {user_id} para eliminar.")
-            return False
-
-        try:
+        if user:
+            logger.info(f"Eliminando usuario con ID: {user_id}")
             self.db.delete(user)
             self.db.commit()
-            logger.info(f"Usuario {user_id} eliminado correctamente.")
-            return True
-        except SQLAlchemyError as e:
-            logger.error(f"Error al eliminar usuario: {e}")
-            self.db.rollback()
-            return False
+            logger.info(f"Usuario eliminado correctamente: {user_id}")
+            return user
+        logger.warning(f"Usuario no encontrado para eliminar: {user_id}")
+        return None
