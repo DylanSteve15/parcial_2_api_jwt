@@ -1,27 +1,26 @@
-# models/user_model.py
 import logging
 from sqlalchemy import Column, Integer, String
-from sqlalchemy.orm import relationship
-from config.database import Base
+from models.db import Base  # Importa la base común de tu proyecto
 
-# Configurar logger
+# Configuración básica de logs
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class User(Base):
     """
-    Modelo que representa a los usuarios del sistema.
-    Cada usuario puede tener múltiples horarios asociados.
+    Modelo de la tabla 'users' para el sistema de horarios.
     """
     __tablename__ = "users"
 
-    id = Column(Integer, primary_key=True, index=True)
-    username = Column(String(50), unique=True, index=True, nullable=False)
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    email = Column(String(100), unique=True, index=True, nullable=False)
     password = Column(String(255), nullable=False)
-    email = Column(String(100), unique=True, nullable=True)
+    role = Column(String(20), default='user', nullable=False)
 
-    # Relación con los horarios
-    horarios = relationship("Horario", back_populates="usuario", cascade="all, delete-orphan")
+    def __init__(self, email, password, role='user'):
+        self.email = email
+        self.password = password
+        self.role = role
 
     def __repr__(self):
-        return f"<User(username={self.username}, email={self.email})>"
+        return f"<User(id={self.id}, email='{self.email}', role='{self.role}')>"

@@ -1,29 +1,23 @@
 import logging
-from flask import Blueprint, request, jsonify
-from flask_jwt_extended import jwt_required
-
-from services.horario_service import HorarioService
-from config.database import get_db_session
-
-# Configuración del logger
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Definición del Blueprint para las rutas de horarios
+from flask import Blueprint, request, jsonify
+from flask_jwt_extended import jwt_required
+from config.database import get_db_session
+from controllers.user_controller import role_required  # Importa el decorador actualizado
+from services.horario_service import HorarioService
+
+# Inicializar servicio y Blueprint
+service = HorarioService(get_db_session())
 horario_bp = Blueprint('horario_bp', __name__)
 
-# Instancia del servicio (en entorno real se maneja por request context)
-service = HorarioService(get_db_session())
-
-
+# ---------------------------------------------------------------------
+# GET - Listar todos los horarios
+# ---------------------------------------------------------------------
 @horario_bp.route('/horarios', methods=['GET'])
 @jwt_required()
-def listar_horarios():
-    """
-    GET /horarios
-    Recupera todos los horarios registrados en el sistema.
-    Retorna una lista JSON con los horarios disponibles.
-    """
+def get_horarios():
     logger.info("Consulta de todos los horarios")
     horarios = service.listar_horarios()
     return jsonify([
@@ -31,103 +25,103 @@ def listar_horarios():
             'id': h.id,
             'materia': h.materia,
             'docente': h.docente,
+            'dia': h.dia,
             'hora_inicio': h.hora_inicio,
             'hora_fin': h.hora_fin,
-            'dia': h.dia
+            'salon': h.salon
         } for h in horarios
-    ]), 200
+    ]), 200, {'Content-Type': 'application/json; charset=utf-8'}
 
-
+# ---------------------------------------------------------------------
+# GET - Obtener horario por ID
+# ---------------------------------------------------------------------
 @horario_bp.route('/horarios/<int:horario_id>', methods=['GET'])
 @jwt_required()
-def obtener_horario(horario_id):
-    """
-    GET /horarios/<horario_id>
-    Recupera un horario específico por su ID.
-    """
-    logger.info(f"Consultando horario con ID: {horario_id}")
+def get_horario(horario_id):
     horario = service.obtener_horario(horario_id)
     if horario:
+        logger.info(f"Consulta de horario por ID: {horario_id}")
         return jsonify({
             'id': horario.id,
             'materia': horario.materia,
             'docente': horario.docente,
+            'dia': horario.dia,
             'hora_inicio': horario.hora_inicio,
             'hora_fin': horario.hora_fin,
-            'dia': horario.dia
-        }), 200
+            'salon': horario.salon
+        }), 200, {'Content-Type': 'application/json; charset=utf-8'}
     logger.warning(f"Horario no encontrado: {horario_id}")
-    return jsonify({'error': 'Horario no encontrado'}), 404
+    return jsonify({'error': 'Horario no encontrado'}), 404, {'Content-Type': 'application/json; charset=utf-8'}
 
-
+# ---------------------------------------------------------------------
+# POST - Crear nuevo horario (solo admin)
+# ---------------------------------------------------------------------
 @horario_bp.route('/horarios', methods=['POST'])
 @jwt_required()
-def crear_horario():
-    """
-    POST /horarios
-    Crea un nuevo horario en el sistema.
-    Cuerpo JSON esperado:
-    {
-        "materia": "Matemáticas",
-        "docente": "Juan Pérez",
-        "hora_inicio": "08:00",
-        "hora_fin": "10:00",
-        "dia": "Lunes"
-    }
-    """
+@role_required('admin')
+def create_horario():
     data = request.get_json()
-    campos = ['materia', 'docente', 'hora_inicio', 'hora_fin', 'dia']
-    
-    # Validar campos requeridos
-    if not all(campo in data and data[campo] for campo in campos):
-        logger.warning("Intento de crear horario con campos incompletos")
-        return jsonify({'error': 'Todos los campos son obligatorios'}), 400
+    materia = data.get('materia')
+    docente = data.get('docente')
+    dia = data.get('dia')
+    hora_inicio = data.get('hora_inicio')
+    hora_fin = data.get('hora_fin')
+    salon = data.get('salon')
 
-    horario = service.crear_horario(**data)
-    logger.info(f"Horario creado para la materia: {data['materia']}")
+    if not all([materia, docente, dia, hora_inicio, hora_fin, salon]):
+        logger.warning("Intento de crear horario sin datos completos")
+        return jsonify({'error': 'Todos los campos son obligatorios'}), 400, {'Content-Type': 'application/json; charset=utf-8'}
+
+    horario = service.crear_horario(materia, docente, dia, hora_inicio, hora_fin, salon)
+    logger.info(f"Horario creado: {materia} - {docente}")
     return jsonify({
         'id': horario.id,
         'materia': horario.materia,
         'docente': horario.docente,
+        'dia': horario.dia,
         'hora_inicio': horario.hora_inicio,
         'hora_fin': horario.hora_fin,
-        'dia': horario.dia
-    }), 201
+        'salon': horario.salon
+    }), 201, {'Content-Type': 'application/json; charset=utf-8'}
 
-
+# ---------------------------------------------------------------------
+# PUT - Actualizar horario (solo admin)
+# ---------------------------------------------------------------------
 @horario_bp.route('/horarios/<int:horario_id>', methods=['PUT'])
-@jwt_required()
-def actualizar_horario(horario_id):
-    """
-    PUT /horarios/<horario_id>
-    Actualiza los datos de un horario existente.
-    """
+@role_required('admin')
+def update_horario(horario_id):
     data = request.get_json()
-    logger.info(f"Actualizando horario con ID: {horario_id}")
-    horario = service.actualizar_horario(horario_id, **data)
+    materia = data.get('materia')
+    docente = data.get('docente')
+    dia = data.get('dia')
+    hora_inicio = data.get('hora_inicio')
+    hora_fin = data.get('hora_fin')
+    salon = data.get('salon')
+
+    horario = service.actualizar_horario(horario_id, materia, docente, dia, hora_inicio, hora_fin, salon)
     if horario:
+        logger.info(f"Horario actualizado: {horario_id}")
         return jsonify({
             'id': horario.id,
             'materia': horario.materia,
             'docente': horario.docente,
+            'dia': horario.dia,
             'hora_inicio': horario.hora_inicio,
             'hora_fin': horario.hora_fin,
-            'dia': horario.dia
-        }), 200
+            'salon': horario.salon
+        }), 200, {'Content-Type': 'application/json; charset=utf-8'}
     logger.warning(f"Horario no encontrado para actualizar: {horario_id}")
-    return jsonify({'error': 'Horario no encontrado'}), 404
+    return jsonify({'error': 'Horario no encontrado'}), 404, {'Content-Type': 'application/json; charset=utf-8'}
 
-
+# ---------------------------------------------------------------------
+# DELETE - Eliminar horario (solo admin)
+# ---------------------------------------------------------------------
 @horario_bp.route('/horarios/<int:horario_id>', methods=['DELETE'])
-@jwt_required()
-def eliminar_horario(horario_id):
-    """
-    DELETE /horarios/<horario_id>
-    Elimina un horario por su ID.
-    """
-    logger.info(f"Intentando eliminar horario con ID: {horario_id}")
-    eliminado = service.eliminar_horario(horario_id)
-    if eliminado:
-        return jsonify({'message': 'Horario eliminado correctamente'}), 200
-    logger.warning(f"No se encontró horario para eliminar: {horario_id}")
-    return jsonify({'error': 'Horario no encontrado'}), 404
+@role_required('admin')
+def delete_horario(horario_id):
+    horario = service.eliminar_horario(horario_id)
+    if horario:
+        logger.info(f"Horario eliminado: {horario_id}")
+        return jsonify({'message': 'Horario eliminado correctamente'}), 200, {'Content-Type': 'application/json; charset=utf-8'}
+    logger.warning(f"Horario no encontrado para eliminar: {horario_id}")
+    return jsonify({'error': 'Horario no encontrado'}), 404, {'Content-Type': 'application/json; charset=utf-8'}
