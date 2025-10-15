@@ -1,320 +1,287 @@
-#static/index.html
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>API de Horarios - Gestión con Roles</title>
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
-    <style>
-        body { 
-            font-family: 'Roboto', sans-serif; 
-            margin: 0; 
-            padding: 20px; 
-            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-            min-height: 100vh;
-        } 
-        .container { max-width: 1200px; margin: 0 auto; }
-        header { text-align: center; margin-bottom: 30px; color: #333; }
-        .title-box {
-            background: linear-gradient(45deg, #28a745, #218838);
-            color: white;
-            padding: 20px 40px;
-            border-radius: 10px;
-            display: inline-block;
-            margin-bottom: 10px;
-            box-shadow: 0 4px 15px rgba(40,167,69,0.3);
-        }
-        .title-box h1 { margin: 0; font-size: 2.5em; }
-        .title-box p { margin: 5px 0 0 0; opacity: 0.9; }
-        form { 
-            max-width: 400px; 
-            margin: 20px auto; 
-            background: white; 
-            padding: 30px; 
-            border-radius: 10px; 
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-            display: flex; 
-            flex-direction: column; 
-        } 
-        input, select { 
-            width: 100%; 
-            margin: 10px 0; 
-            padding: 12px; 
-            border: 1px solid #ddd; 
-            border-radius: 5px; 
-            font-size: 16px;
-        } 
-        button { 
-            padding: 12px; 
-            background: linear-gradient(45deg, #28a745, #218838); 
-            color: white; 
-            border: none; 
-            border-radius: 5px; 
-            cursor: pointer; 
-            margin: 5px 0; 
-            font-size: 16px; 
-            transition: transform 0.2s, box-shadow 0.2s;
-        } 
-        button:hover { transform: translateY(-2px); box-shadow: 0 4px 10px rgba(40,167,69,0.3); }
-        .btn-secondary { background: linear-gradient(45deg, #6c757d, #495057); }
-        .btn-edit { 
-            background: linear-gradient(45deg, #ffc107, #e0a800); 
-            color: black; 
-            width: auto; 
-            padding: 8px 12px; 
-            margin: 2px; 
-            font-size: 14px;
-        } 
-        .btn-delete { 
-            background: linear-gradient(45deg, #dc3545, #c82333); 
-            width: auto; 
-            padding: 8px 12px; 
-            margin: 2px; 
-            font-size: 14px;
-        } 
-        #crud { display: none; } 
-        #createSection { 
-            display: none; 
-            margin: 20px auto; 
-            max-width: 600px; 
-            background: white; 
-            border-radius: 10px; 
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-            overflow: hidden;
-        }  
-        #createToggle { 
-            width: 100%; 
-            padding: 15px; 
-            background: linear-gradient(45deg, #28a745, #218838); 
-            color: white; 
-            border: none; 
-            font-size: 18px; 
-            font-weight: 500; 
-            text-align: center; 
-            cursor: pointer; 
-        }
-        #createContent { 
-            padding: 20px; 
-            max-height: 0; 
-            overflow: hidden; 
-            transition: max-height 0.3s ease-out; 
-        }
-        #createContent.expanded { max-height: 600px; }
-        table { 
-            width: 100%; 
-            border-collapse: collapse; 
-            margin-top: 20px; 
-            background: white; 
-            border-radius: 10px; 
-            overflow: hidden; 
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-        } 
-        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; } 
-        th { background: linear-gradient(45deg, #28a745, #218838); color: white; }
-        tr:hover { background-color: #f8f9fa; transition: background-color 0.2s; }
-        .admin-only { display: none; }  
-        #roleInfo { 
-            margin: 10px; 
-            padding: 15px; 
-            background: linear-gradient(45deg, #e7f3ff, #d4edda); 
-            border-radius: 5px; 
-            text-align: center; 
-            font-weight: 500;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gestión de Horarios - Roles CRUD</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Poppins', sans-serif;
+      margin: 0;
+      background: linear-gradient(135deg, #e3f2fd 0%, #d0f0c0 100%);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding: 30px;
+      color: #333;
+    }
+    .container {
+      width: 100%;
+      max-width: 1100px;
+      background: #fff;
+      border-radius: 15px;
+      padding: 30px;
+      box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+    }
+    header {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    header h1 {
+      color: #2c7a7b;
+      margin: 0;
+      font-size: 2.3em;
+    }
+    header p {
+      color: #555;
+    }
+    form {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    input, select {
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      font-size: 16px;
+    }
+    button {
+      padding: 12px;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
+      background: linear-gradient(45deg, #2c7a7b, #319795);
+      color: white;
+      font-weight: 600;
+      transition: all 0.2s ease-in-out;
+    }
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 10px rgba(50, 150, 150, 0.3);
+    }
+    .btn-secondary {
+      background: linear-gradient(45deg, #718096, #4a5568);
+    }
+    .admin-only { display: none; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 25px;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    th, td {
+      padding: 12px;
+      border: 1px solid #ddd;
+    }
+    th {
+      background: linear-gradient(45deg, #319795, #2c7a7b);
+      color: white;
+    }
+    tr:hover {
+      background: #f7fafc;
+    }
+    #roleInfo {
+      background: #e6fffa;
+      padding: 10px;
+      border-left: 5px solid #38b2ac;
+      border-radius: 5px;
+      margin-bottom: 15px;
+    }
+    #toast {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: #319795;
+      color: white;
+      padding: 12px 20px;
+      border-radius: 8px;
+      display: none;
+      animation: fadeIn 0.4s ease;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
 </head>
 <body>
 <div class="container">
-    <header>
-        <div class="title-box">
-            <h1>📅 API de Horarios</h1>
-            <p>Gestión de horarios académicos con roles</p>
-        </div>
-    </header>
+  <header>
+    <h1>📅 Gestión de Horarios</h1>
+    <p>CRUD con control de roles (JWT + Flask)</p>
+  </header>
 
-    <div id="login">
-        <form id="loginForm">
-            <h2 style="text-align:center;">Iniciar Sesión</h2>
-            <input type="email" id="email" placeholder="Correo electrónico" required>
-            <input type="password" id="password" placeholder="Contraseña" required>
-            <button type="submit">Iniciar Sesión</button>
-        </form>
-        <button id="registerBtn" class="btn-secondary" style="display:block;margin:auto;">¿No tienes cuenta? Regístrate</button>
+  <!-- LOGIN -->
+  <div id="login">
+    <form id="loginForm">
+      <input type="email" id="email" placeholder="Correo electrónico" required>
+      <input type="password" id="password" placeholder="Contraseña" required>
+      <button type="submit">Iniciar Sesión</button>
+    </form>
+    <button id="registerBtn" class="btn-secondary" style="margin-top:10px;">¿No tienes cuenta? Regístrate</button>
+  </div>
+
+  <!-- REGISTRO -->
+  <div id="register" style="display:none;">
+    <form id="registerForm">
+      <input type="email" id="regEmail" placeholder="Correo electrónico" required>
+      <input type="password" id="regPassword" placeholder="Contraseña" required>
+      <label><input type="checkbox" id="adminRole"> Registrar como Admin</label>
+      <button type="submit">Registrarse</button>
+    </form>
+    <button id="backToLogin" class="btn-secondary" style="margin-top:10px;">Volver a Login</button>
+  </div>
+
+  <!-- CRUD -->
+  <div id="crud" style="display:none;">
+    <div id="roleInfo"></div>
+    <button id="logout" class="btn-secondary" style="float:right;">Cerrar Sesión</button>
+    <br><br>
+
+    <div id="createSection" class="admin-only">
+      <form id="createForm">
+        <select id="dia" required>
+          <option value="">Día</option>
+          <option>Lunes</option><option>Martes</option><option>Miércoles</option>
+          <option>Jueves</option><option>Viernes</option><option>Sábado</option>
+        </select>
+        <input type="time" id="hora_inicio" required>
+        <input type="time" id="hora_fin" required>
+        <input type="text" id="materia" placeholder="Materia" required>
+        <input type="text" id="profesor" placeholder="Profesor" required>
+        <button type="submit">Guardar Horario</button>
+      </form>
     </div>
 
-    <div id="register" style="display:none;">
-        <form id="registerForm">
-            <h2 style="text-align:center;">Registro</h2>
-            <input type="email" id="regEmail" placeholder="Correo electrónico" required>
-            <input type="password" id="regPassword" placeholder="Contraseña" required>
-            <label><input type="checkbox" id="adminRole"> Registrar como Admin</label>
-            <button type="submit">Registrarse</button>
-        </form>
-        <button id="backToLogin" class="btn-secondary" style="display:block;margin:auto;">Volver a Login</button>
-    </div>
-
-    <div id="crud">
-        <div id="roleInfo"></div>
-        <button id="logout" class="btn-secondary" style="float:right;">Cerrar Sesión</button>
-
-        <div id="createSection" class="admin-only">
-            <button id="createToggle">➕ Crear Horario</button>
-            <div id="createContent">
-                <form id="createForm">
-                    <input type="hidden" id="editId">
-                    <select id="dia" required>
-                        <option value="">Seleccione un día</option>
-                        <option>Lunes</option><option>Martes</option>
-                        <option>Miércoles</option><option>Jueves</option>
-                        <option>Viernes</option><option>Sábado</option>
-                    </select>
-                    <input type="time" id="hora_inicio" required>
-                    <input type="time" id="hora_fin" required>
-                    <input type="text" id="materia" placeholder="Materia" required>
-                    <input type="text" id="profesor" placeholder="Profesor" required>
-                    <button type="submit" id="submitBtn">Guardar Horario</button>
-                    <button type="button" id="cancelEdit" class="btn-secondary" style="display:none;">Cancelar</button>
-                </form>
-            </div>
-        </div>
-
-        <table id="horariosTable">
-            <thead>
-                <tr>
-                    <th>ID</th><th>Día</th><th>Hora Inicio</th><th>Hora Fin</th><th>Materia</th><th>Profesor</th><th class="admin-only">Acciones</th>
-                </tr>
-            </thead>
-            <tbody></tbody>
-        </table>
-    </div>
+    <table id="horariosTable">
+      <thead>
+        <tr>
+          <th>ID</th><th>Día</th><th>Inicio</th><th>Fin</th><th>Materia</th><th>Profesor</th><th class="admin-only">Acciones</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
 </div>
 
+<div id="toast"></div>
+
 <script>
-    // --- Configuración base ---
-    const apiBase = '/api/horarios'; // Cambia si tu ruta es diferente
-    let token = localStorage.getItem('token');
-    let currentRole = localStorage.getItem('role');
+  const apiBase = '/api/horarios';
+  let token = localStorage.getItem('token');
+  let currentRole = localStorage.getItem('role');
 
-    if (token && currentRole) showCRUD(currentRole);
+  if (token && currentRole) showCRUD(currentRole);
 
-    function decodeToken(token) {
-        try {
-            const payload = JSON.parse(atob(token.split('.')[1]));
-            return payload.role;
-        } catch {
-            return null;
-        }
-    }
+  function decodeToken(token) {
+    try { return JSON.parse(atob(token.split('.')[1])).role; }
+    catch { return null; }
+  }
 
-    // --- Login ---
-    document.getElementById('loginForm').addEventListener('submit', async e => {
-        e.preventDefault();
-        const email = email.value, password = password.value;
-        const res = await fetch('/api/login', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password })
-        });
-        if (res.ok) {
-            const data = await res.json();
-            token = data.access_token;
-            currentRole = decodeToken(token);
-            localStorage.setItem('token', token);
-            localStorage.setItem('role', currentRole);
-            showCRUD(currentRole);
-        } else alert('Credenciales incorrectas');
+  function showToast(msg, color = '#319795') {
+    const toast = document.getElementById('toast');
+    toast.style.background = color;
+    toast.textContent = msg;
+    toast.style.display = 'block';
+    setTimeout(() => toast.style.display = 'none', 3000);
+  }
+
+  // LOGIN
+  document.getElementById('loginForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const res = await fetch('/api/login', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email.value, password: password.value })
     });
+    if (res.ok) {
+      const data = await res.json();
+      token = data.access_token;
+      currentRole = decodeToken(token);
+      localStorage.setItem('token', token);
+      localStorage.setItem('role', currentRole);
+      showCRUD(currentRole);
+    } else showToast('Credenciales incorrectas', '#e53e3e');
+  });
 
-    // --- Registro ---
-    document.getElementById('registerBtn').addEventListener('click', () => {
-        document.getElementById('login').style.display = 'none';
-        document.getElementById('register').style.display = 'block';
+  // REGISTRO
+  registerBtn.onclick = () => { login.style.display = 'none'; register.style.display = 'block'; };
+  backToLogin.onclick = () => { register.style.display = 'none'; login.style.display = 'block'; };
+  registerForm.addEventListener('submit', async e => {
+    e.preventDefault();
+    const res = await fetch('/api/registry', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: regEmail.value, password: regPassword.value,
+        role: adminRole.checked ? 'admin' : 'user'
+      })
     });
-    document.getElementById('backToLogin').addEventListener('click', () => {
-        document.getElementById('register').style.display = 'none';
-        document.getElementById('login').style.display = 'block';
+    showToast(res.ok ? 'Usuario registrado con éxito' : 'Error al registrar', res.ok ? '#38a169' : '#e53e3e');
+  });
+
+  // CRUD
+  function showCRUD(role) {
+    login.style.display = 'none';
+    register.style.display = 'none';
+    crud.style.display = 'block';
+    roleInfo.innerHTML = `<b>Rol:</b> ${role}`;
+    toggleAdmin(role === 'admin');
+    loadHorarios(role);
+  }
+
+  function toggleAdmin(show) {
+    document.querySelectorAll('.admin-only').forEach(el => el.style.display = show ? '' : 'none');
+    document.getElementById('createSection').style.display = show ? 'block' : 'none';
+  }
+
+  async function loadHorarios(role) {
+    const res = await fetch(apiBase, { headers: { Authorization: `Bearer ${token}` } });
+    const data = await res.json();
+    const tbody = document.querySelector('#horariosTable tbody');
+    tbody.innerHTML = data.map(h => `
+      <tr>
+        <td>${h.id}</td><td>${h.dia}</td><td>${h.hora_inicio}</td>
+        <td>${h.hora_fin}</td><td>${h.materia}</td><td>${h.profesor}</td>
+        ${role === 'admin' ? `<td><button class="btn-secondary" onclick="deleteHorario(${h.id})">🗑️</button></td>` : ''}
+      </tr>`).join('');
+  }
+
+  createForm.addEventListener('submit', async e => {
+    e.preventDefault();
+    const horario = {
+      dia: dia.value, hora_inicio: hora_inicio.value,
+      hora_fin: hora_fin.value, materia: materia.value, profesor: profesor.value
+    };
+    const res = await fetch(apiBase, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(horario)
     });
-    document.getElementById('registerForm').addEventListener('submit', async e => {
-        e.preventDefault();
-        const email = regEmail.value, password = regPassword.value;
-        const role = adminRole.checked ? 'admin' : 'user';
-        const res = await fetch('/api/registry', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password, role })
-        });
-        alert(res.ok ? 'Usuario registrado con éxito' : 'Error al registrar');
+    if (res.ok) {
+      showToast('✅ Horario agregado correctamente', '#38a169');
+      e.target.reset();
+      loadHorarios(currentRole);
+    } else showToast('Error al agregar horario', '#e53e3e');
+  });
+
+  async function deleteHorario(id) {
+    if (!confirm('¿Eliminar este horario?')) return;
+    const res = await fetch(`${apiBase}/${id}`, {
+      method: 'DELETE', headers: { Authorization: `Bearer ${token}` }
     });
+    showToast(res.ok ? 'Horario eliminado' : 'Error al eliminar', res.ok ? '#38a169' : '#e53e3e');
+    loadHorarios(currentRole);
+  }
 
-    // --- CRUD ---
-    function showCRUD(role) {
-        document.getElementById('login').style.display = 'none';
-        document.getElementById('register').style.display = 'none';
-        document.getElementById('crud').style.display = 'block';
-        document.getElementById('roleInfo').innerHTML = `<b>Rol:</b> ${role}`;
-        loadHorarios();
-        toggleAdmin(role === 'admin');
-    }
-
-    function toggleAdmin(show) {
-        document.querySelectorAll('.admin-only').forEach(el => el.style.display = show ? '' : 'none');
-        document.getElementById('createSection').style.display = show ? 'block' : 'none';
-    }
-
-    async function loadHorarios() {
-        const res = await fetch(apiBase, { headers: { Authorization: `Bearer ${token}` } });
-        const data = await res.json();
-        const tbody = document.querySelector('#horariosTable tbody');
-        tbody.innerHTML = data.map(h => `
-            <tr>
-                <td>${h.id}</td>
-                <td>${h.dia}</td>
-                <td>${h.hora_inicio}</td>
-                <td>${h.hora_fin}</td>
-                <td>${h.materia}</td>
-                <td>${h.profesor}</td>
-                <td class="admin-only">
-                    <button class="btn-edit" onclick="editHorario(${h.id}, '${h.dia}', '${h.hora_inicio}', '${h.hora_fin}', '${h.materia}', '${h.profesor}')">Editar</button>
-                    <button class="btn-delete" onclick="deleteHorario(${h.id})">Eliminar</button>
-                </td>
-            </tr>`).join('');
-    }
-
-    document.getElementById('createForm').addEventListener('submit', async e => {
-        e.preventDefault();
-        const data = {
-            dia: dia.value,
-            hora_inicio: hora_inicio.value,
-            hora_fin: hora_fin.value,
-            materia: materia.value,
-            profesor: profesor.value
-        };
-        const method = editId.value ? 'PUT' : 'POST';
-        const url = editId.value ? `${apiBase}/${editId.value}` : apiBase;
-        await fetch(url, {
-            method, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-            body: JSON.stringify(data)
-        });
-        e.target.reset();
-        editId.value = '';
-        loadHorarios();
-    });
-
-    async function deleteHorario(id) {
-        if (!confirm('¿Eliminar este horario?')) return;
-        await fetch(`${apiBase}/${id}`, {
-            method: 'DELETE', headers: { Authorization: `Bearer ${token}` }
-        });
-        loadHorarios();
-    }
-
-    function editHorario(id, dia_, inicio, fin, materia_, profesor_) {
-        editId.value = id;
-        dia.value = dia_;
-        hora_inicio.value = inicio;
-        hora_fin.value = fin;
-        materia.value = materia_;
-        profesor.value = profesor_;
-    }
+  logout.onclick = () => {
+    localStorage.clear();
+    location.reload();
+  };
 </script>
 </body>
 </html>
