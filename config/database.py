@@ -1,3 +1,4 @@
+#config/database.py
 import os
 import logging
 from sqlalchemy import create_engine
@@ -14,7 +15,7 @@ load_dotenv()
 
 # URI principal y de respaldo
 MYSQL_URI = os.getenv("MYSQL_URI")  # Ejemplo: mysql+pymysql://user:password@host/db
-SQLITE_URI = "sqlite:///horarios_local.db"
+SQLITE_URI = "sqlite:///horario_local.db"
 
 def get_engine():
     """

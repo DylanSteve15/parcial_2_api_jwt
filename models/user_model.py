@@ -1,3 +1,4 @@
+#models/user_models
 import logging
 from sqlalchemy import Column, Integer, String
 from models.db import Base  # Importa la base común de tu proyecto

@@ -1,0 +1,100 @@
+# =============================================
+# Pruebas de API Horarios con CURL
+# =============================================
+# Descripción: Este archivo contiene curls para probar la protección JWT y roles.
+# - Admin puede: GET, POST, PUT, DELETE.
+# - User normal puede: Solo GET (listar).
+# - Sin token: 401 (no autenticado).
+# - Con token user en POST/DELETE: 403 (rol insuficiente).
+# Uso: Copia y pega en terminal. Tokens pueden expirar (1h); repite login.
+# =============================================
+
+# -----------------------------
+# PRUEBAS ADMIN (rol: admin)
+# -----------------------------
+
+# 1. Registro Admin (crea si no existe; role: admin)
+curl -X POST http://127.0.0.1:5000/api/registry \
+-H "Content-Type: application/json" \
+-d '{"email": "admin@ejemplo.com", "password": "admin1234", "role": "admin"}'
+# Esperado: 201 {"id": X, "email": "...", "role": "admin"} o 400 si ya existe.
+
+# 2. Login Admin (obtiene token)
+curl -X POST http://127.0.0.1:5000/api/login \
+-H "Content-Type: application/json" \
+-d '{"email": "admin@ejemplo.com", "password": "admin1234"}'
+# Esperado: 200 {"access_token": "eyJ...", "refresh_token": "..."}. Copia access_token.
+
+# 3. POST Crear Horario SIN token (prueba protección JWT)
+curl -X POST http://127.0.0.1:5000/api/horarios \
+-H "Content-Type: application/json" \
+-d '{"materia": "Cálculo", "profesor": "Juan Pérez", "dia": "Lunes", "hora_inicio": "08:00", "hora_fin": "10:00"}'
+# Esperado: 401 {"error": "No autenticado..."}
+
+# 4. POST Crear Horario CON token Admin (prueba éxito)
+curl -X POST http://127.0.0.1:5000/api/horarios \
+-H "Content-Type: application/json" \
+-H "Authorization: Bearer TU_TOKEN_AQUI" \
+-d '{"materia": "Cálculo", "profesor": "Juan Pérez", "dia": "Lunes", "hora_inicio": "08:00", "hora_fin": "10:00"}'
+# Esperado: 201 {"id": X, "materia": "Cálculo", ...}
+
+# 5. GET Horarios SIN token (prueba JWT)
+curl -X GET http://127.0.0.1:5000/api/horarios
+# Esperado: 401 {"error": "No autenticado..."}
+
+# 6. GET Horarios CON token Admin (prueba lectura)
+curl -X GET http://127.0.0.1:5000/api/horarios \
+-H "Authorization: Bearer TU_TOKEN_AQUI"
+# Esperado: 200 [{"id": X, "materia": "...", ...}]
+
+# 7. DELETE Horario CON token Admin (ID=1; prueba eliminación)
+curl -X DELETE http://127.0.0.1:5000/api/horarios/1 \
+-H "Authorization: Bearer TU_TOKEN_AQUI"
+# Esperado: 200 {"message": "Horario eliminado"} o 404 si no existe.
+
+
+# -----------------------------
+# PRUEBAS USER NORMAL (rol: user)
+# -----------------------------
+
+# 8. Registro User Normal (role default: user)
+curl -X POST http://127.0.0.1:5000/api/registry \
+-H "Content-Type: application/json" \
+-d '{"email": "user@ejemplo.com", "password": "user1234"}'
+# Esperado: 201 {"id": X, "email": "...", "role": "user"}
+
+# 9. Login User Normal
+curl -X POST http://127.0.0.1:5000/api/login \
+-H "Content-Type: application/json" \
+-d '{"email": "user@ejemplo.com", "password": "user1234"}'
+# Esperado: 200 {"access_token": "eyJ...", "refresh_token": "..."}. Copia access_token.
+
+# 10. GET Horarios CON token User (prueba lectura permitida)
+curl -X GET http://127.0.0.1:5000/api/horarios \
+-H "Authorization: Bearer TU_TOKEN_USER_AQUI"
+# Esperado: 200 [{"id": X, "materia": "...", ...}]
+
+# 11. POST Crear Horario CON token User (rol insuficiente)
+curl -X POST http://127.0.0.1:5000/api/horarios \
+-H "Content-Type: application/json" \
+-H "Authorization: Bearer TU_TOKEN_USER_AQUI" \
+-d '{"materia": "Historia", "profesor": "Laura Gómez", "dia": "Martes", "hora_inicio": "10:00", "hora_fin": "12:00"}'
+# Esperado: 403 {"error": "Rol requerido"}
+
+# 12. DELETE Horario CON token User (rol insuficiente)
+curl -X DELETE http://127.0.0.1:5000/api/horarios/1 \
+-H "Authorization: Bearer TU_TOKEN_USER_AQUI"
+# Esperado: 403 {"error": "Rol requerido"}
+
+# -----------------------------
+# Notas:
+# -----------------------------
+# - Sustituye TU_TOKEN_AQUI y TU_TOKEN_USER_AQUI por el access_token obtenido en el login.
+# - Si obtienes error 500, revisa logs del servidor (posible bug o datos inválidos).
+# - Tokens expiran en 1h; repite login si recibes 401 tras mucho tiempo.
+# - Para PUT (update), usa:
+#   curl -X PUT http://127.0.0.1:5000/api/horarios/ID \
+#   -H "Content-Type: application/json" \
+#   -H "Authorization: Bearer TU_TOKEN_AQUI" \
+#   -d '{"materia": "Actualizada", "profesor": "Nuevo Docente"}'
+# - ¡Protección JWT + roles confirmada si obtienes 401 y 403 correctamente!

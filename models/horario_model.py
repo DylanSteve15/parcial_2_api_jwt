@@ -1,3 +1,4 @@
+#models/horario_model
 import logging
 from sqlalchemy import Column, Integer, String, Time, Date
 from models.db import Base

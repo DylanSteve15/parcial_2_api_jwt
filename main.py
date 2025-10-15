@@ -1,3 +1,4 @@
+# main.py
 from models.db import Base
 from config.database import engine
 from flask import Flask, send_from_directory

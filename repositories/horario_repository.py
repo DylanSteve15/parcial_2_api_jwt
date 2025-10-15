@@ -1,3 +1,4 @@
+#repositories/horario_repository
 import logging
 from sqlalchemy.orm import Session
 from models.horario_model import Horario
