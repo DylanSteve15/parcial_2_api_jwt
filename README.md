@@ -1,170 +1,118 @@
-# 🕒 API Horarios con Autenticación JWT
+# API Horarios con Autenticación JWT
 
-## 📘 Descripción
-Esta API Flask gestiona un **CRUD completo para los horarios**, con **autenticación segura vía JWT**, **hashing de contraseñas (bcrypt)** y **autorización por roles (admin/usuario)**.  
-Incluye endpoints protegidos para la gestión de usuarios y horarios, donde los **usuarios normales pueden consultar** y los **administradores pueden crear, modificar y eliminar** horarios.
+## Descripción
+Esta API Flask gestiona un CRUD completo para horarios, con autenticación segura vía JWT, hashing de contraseñas (bcrypt) y autorización por roles (user/admin). Incluye un frontend simple en HTML/JS para login, registro y gestión condicional por rol. El login redirige automáticamente al dashboard, donde users solo pueden listar horarios y admins gestionan todo.
 
-**Tecnologías utilizadas:**  
-Flask, SQLAlchemy, Flask-JWT-Extended, bcrypt, MySQL/SQLite (fallback automático).
+Tecnologías: Flask, SQLAlchemy, Flask-JWT-Extended, bcrypt, SQLite/MySQL fallback.
 
----
+## Instalación
+1. Haz un fork del repositorio en GitHub: Ve a tu repo y cópialo a tu cuenta.
 
-## ⚙️ Instalación
+2. Crea un entorno virtual (opcional, recomendado):
+   ```bash
+   python -m venv venv
+   source venv/bin/activate
+   # En Windows: venv\Scripts\activate
+Instala dependencias:
 
-### 1️⃣ Clonar el repositorio
-```bash
-git clone https://github.com/tu-usuario/flask_horarios_api.git
-cd flask_horarios_api
-### 2️⃣ Crear entorno virtual (opcional pero recomendado)
-bash
-Copiar código
-python -m venv venv
-source venv/bin/activate  # En Windows: venv\Scripts\activate
-### 3️⃣ Instalar dependencias
 bash
 Copiar código
 pip install -r requirements.txt
-### 4️⃣ Configurar el archivo .env
-Crea un archivo llamado .env en la raíz del proyecto:
+Configura el archivo .env (ver sección siguiente).
 
-bash
+Inicializa la base de datos (se crea automáticamente al correr).
+
+Variables de Entorno
+Crea un archivo .env en la raíz del proyecto:
+
+env
 Copiar código
-MYSQL_URI=mysql+pymysql://usuario:contraseña@localhost/horarios_db  # Opcional, usa SQLite si no está disponible
-JWT_SECRET_KEY=clave-super-secreta-y-larga-para-tokens-1234567890abcdef
-MYSQL_URI: conexión MySQL (usa SQLite por defecto: horarios_local.db).
+MYSQL_URI=mysql+pymysql://usuario:contraseña@localhost/nombre_db  # Opcional; fallback a SQLite
+JWT_SECRET_KEY=tu-clave-super-secreta-y-larga-minimo-32-caracteres-1234567890abcdef
+MYSQL_URI: Conexión MySQL (si no, usa SQLite local: horarios_local.db).
 
-JWT_SECRET_KEY: clave secreta para generar los tokens JWT (mínimo 32 caracteres).
+JWT_SECRET_KEY: Clave secreta para JWT (genera una fuerte; expira tokens en 1h).
 
-▶️ Cómo Ejecutar el Proyecto
-1️⃣ Asegúrate de tener el .env configurado correctamente
-2️⃣ Ejecuta el servidor
+Cómo Correr en Dev
+Asegúrate de que .env esté configurado.
+
+Ejecuta el servidor:
+
 bash
 Copiar código
 python app.py
-3️⃣ Abre en el navegador:
-👉 http://127.0.0.1:5000/
+Abre en el navegador: http://127.0.0.1:5000/
 
-Login de prueba:
-Usuario: admin@ejemplo.com
-Contraseña: 1234 (regístralo si no existe)
+Login pre-rellenado: Email admin1234@ejemplo.com / Password 1234 (regístralo si no existe).
 
-Dashboard:
+Dashboard: CRUD de horarios (admin: full; user: solo lectura).
 
-Usuarios: solo pueden consultar horarios
+Para producción: Usa Gunicorn/WSGI, configura HTTPS y mueve a un servidor real.
 
-Administradores: pueden crear, editar o eliminar horarios
-
-⚠️ En producción usa Gunicorn o WSGI, configura HTTPS y despliega en un servidor seguro.
-
-🧩 Estructura del Proyecto
-markdown
-Copiar código
-flask_horarios_api/
-│
-├── app.py
-├── config.py
-├── requirements.txt
-├── .env
-│
-├── models/
-│   ├── __init__.py
-│   ├── user_model.py
-│   └── horario_model.py
-│
-├── controllers/
-│   ├── __init__.py
-│   └── horario_controller.py
-│
-├── routes/
-│   ├── __init__.py
-│   ├── horario_routes.py
-│   └── auth_routes.py
-│
-├── utils/
-│   ├── __init__.py
-│   └── auth_middleware.py
-│
-└── tests/
-    └── test_auth.py
-🔐 Flujo de Autenticación
-Paso	Descripción	Endpoint
-Registro	Crea un nuevo usuario con email, password y rol (por defecto usuario)	POST /api/registro
-Login	Devuelve access_token (1h) y refresh_token (14 días)	POST /api/login
-Autenticación	Rutas protegidas requieren Authorization: Bearer <token>	-
-Refrescar token	Renueva el access_token cuando expira	POST /api/refresh
-Logout	Invalida el token actual (blacklist temporal)	POST /api/logout
-
-🧠 Roles y Permisos
-Rol	Descripción	Acceso
-usuario	Solo lectura	Consultar horarios
-admin	Control total	Crear, actualizar, eliminar y consultar horarios
-
-Solo un administrador inicial puede existir. Los siguientes registros serán usuarios normales.
-
-🧾 Tabla de Endpoints
-Método	Endpoint	Descripción	Autenticación	Rol Requerido	Ejemplo de Body
-POST	/api/registro	Registro de usuario	No	-	{"email": "test@test.com", "password": "1234", "role": "admin"}
-POST	/api/login	Login de usuario	No	-	{"email": "test@test.com", "password": "1234"}
-POST	/api/refresh	Renueva el token JWT	Refresh	-	-
-POST	/api/logout	Cierra sesión e invalida token	Sí	-	-
-GET	/api/horarios	Lista todos los horarios	Sí	usuario	-
-GET	/api/horarios/<id>	Detalle de horario	Sí	usuario	-
-POST	/api/horarios	Crea un nuevo horario	Sí	admin	{"materia": "Cálculo", "dia": "Lunes", "hora_inicio": "08:00", "hora_fin": "10:00"}
-PUT	/api/horarios/<id>	Actualiza un horario	Sí	admin	Igual que POST
-DELETE	/api/horarios/<id>	Elimina un horario	Sí	admin	-
-GET	/api/usuarios	Lista todos los usuarios	Sí	admin	-
-
-🧪 Pruebas Unitarias
-1️⃣ Instalar pytest:
+Cómo Ejecutar Pruebas
+Instala pytest (ya en requirements.txt):
 
 bash
 Copiar código
 pip install pytest
-2️⃣ Ejecutar pruebas:
+Ejecuta las pruebas mínimas (login válido/inválido, rutas protegidas):
 
 bash
 Copiar código
 pytest tests/test_auth.py -v
-Cubre:
+Cubre: Registro/login, acceso con/sin token, roles.
 
-Registro y login
+Para pruebas manuales con curl, usa test_curls.txt (incluido en repo).
 
-Acceso con y sin token
+Roles
+user (default): Puede listar horarios (GET /api/horarios y GET /api/horarios/<id>). No puede crear/actualizar/eliminar.
 
-Roles y permisos
+admin: Acceso completo (GET/POST/PUT/DELETE en horarios; gestión de users). Solo uno permitido (bloqueo en registro).
 
-Rutas protegidas
+Asigna rol en registro (solo manual o vía checkbox en frontend).
 
-🧰 Ejemplo de Token JWT
-Access Token (Admin)
+Ejemplo de Tokens
+Tokens JWT incluyen role en claims. Decodifícalos en jwt.io (pega el access_token).
+
+Ejemplo Access Token (Admin):
+
 Copiar código
-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-Decodificado en jwt.io:
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYWRtaW4iLCJzdWIiOiIxIiwiZXhwIjoxNzYwMjUwMTY1fQ.BisXJ4n7Sn_uHJTlLzCQREj_j53QE8kpKGJo09gkSNI
+Decodificado: {"sub": "1", "role": "admin", "exp": 1760250165} (expira en 1h).
 
-json
+Ejemplo Refresh Token:
+
 Copiar código
-{
-  "sub": "1",
-  "role": "admin",
-  "exp": 1760250165
-}
-Refresh Token
-Usa:
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwicm9sZSI6ImFkbWluIiwiZXhwIjoxNzYyODM4NTY1fQ.tH2CGtPMAHtYIvUEQVM6bw4ub8yneOTwoV6s9FaeUtM
+POST /api/refresh con Authorization: Bearer <refresh_token> → Nuevo access_token.
 
-bash
-Copiar código
-POST /api/refresh
-Authorization: Bearer <refresh_token>
-Devuelve un nuevo access_token.
+Flujo de Autenticación
+Registro: POST /api/registry con {email, password, role?} (default 'user'). Hash de password y chequeo de admin único.
 
-📦 Producción y Despliegue
-Usa Gunicorn o Waitress como servidor WSGI.
+Login: POST /api/login con {email, password} → Devuelve access_token (1h) y refresh_token (14 días). Rol en claims.
 
-Configura HTTPS.
+Uso: Headers Authorization: Bearer <access_token> en rutas protegidas. @jwt_required() verifica token; role_required() chequea rol.
 
-Integra Dockerfile incluido para despliegue rápido:
+Refresh: POST /api/refresh con refresh_token → Nuevo access_token.
 
-bash
-Copiar código
-docker build -t flask_horarios_api .
-docker run -p 5000:5000 flask_horarios_api
+Logout: POST /api/logout → Invalida token en blacklist (memoria; prod: Redis).
+
+Expiración: Access 1h; refresh 14d. Frontend guarda en localStorage y redirige post-login.
+
+Tabla de Endpoints
+Método	Endpoint	Descripción	Autenticación	Rol Requerido	Ejemplo de Body
+POST	/api/registry	Registro de usuario	No	-	{"email": "test@test.com", "password": "pass", "role": "admin"}
+POST	/api/login	Login y tokens JWT	No	-	{"email": "test@test.com", "password": "pass"}
+POST	/api/refresh	Renovar access_token	Refresh Token	-	(Usa refresh en header)
+POST	/api/logout	Cierre de sesión (invalida token)	Sí (JWT)	-	-
+GET	/api/horarios	Lista todos los horarios	Sí (JWT)	user	-
+GET	/api/horarios/<id>	Detalle de un horario	Sí (JWT)	user	-
+POST	/api/horarios	Crear horario	Sí (JWT)	admin	{"dia": "Lunes", "hora_inicio": "08:00", "hora_fin": "10:00", "actividad": "Clase de Matemáticas"}
+PUT	/api/horarios/<id>	Actualizar horario	Sí (JWT)	admin	Igual que POST
+DELETE	/api/horarios/<id>	Eliminar horario	Sí (JWT)	admin	-
+GET	/api/users	Lista usuarios (admin only)	Sí (JWT)	admin	-
+GET	/api/users/<id>	Detalle usuario	Sí (JWT)	-	-
+PUT	/api/users/<id>	Actualizar usuario	Sí (JWT)	admin	{"email": "new@test.com", "password": "newpass"}
+DELETE	/api/users/<id>	Eliminar usuario	Sí (JWT)	admin	-
+
+Notas: Todos los cuerpos son JSON. Errores comunes: 400 (datos inválidos), 401 (no autenticado), 403 (rol insuficiente), 404 (no encontrado).
