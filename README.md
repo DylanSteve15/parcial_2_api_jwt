@@ -15,16 +15,16 @@ Flask, SQLAlchemy, Flask-JWT-Extended, bcrypt, MySQL/SQLite (fallback automátic
 ```bash
 git clone https://github.com/tu-usuario/flask_horarios_api.git
 cd flask_horarios_api
-2️⃣ Crear entorno virtual (opcional pero recomendado)
+### 2️⃣ Crear entorno virtual (opcional pero recomendado)
 bash
 Copiar código
 python -m venv venv
 source venv/bin/activate  # En Windows: venv\Scripts\activate
-3️⃣ Instalar dependencias
+### 3️⃣ Instalar dependencias
 bash
 Copiar código
 pip install -r requirements.txt
-4️⃣ Configurar el archivo .env
+### 4️⃣ Configurar el archivo .env
 Crea un archivo llamado .env en la raíz del proyecto:
 
 bash
