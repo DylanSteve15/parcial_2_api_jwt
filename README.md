@@ -68,6 +68,41 @@ Tokens JWT incluyen role en claims. Decodifícalos en jwt.io (pega el access_tok
 
 Decodificado: {"sub": "1", "role": "admin", "exp": 1760250165} (expira en 1h).
 
-Ejemplo Refresh Token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwicm9sZSI6ImFkbWluIiwiZXhwIjoxNzYyODM4NTY1fQ.tH2CGtPMAHtYIvUEQVM6bw4ub8yneOTwoV6s9FaeUtM
+## Ejemplo Refresh Token: 
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwicm9sZSI6ImFkbWluIiwiZXhwIjoxNzYyODM4NTY1fQ.tH2CGtPMAHtYIvUEQVM6bw4ub8yneOTwoV6s9FaeUtM
 
+POST /api/refresh con Authorization: Bearer <refresh_token> → Nuevo access_token.
 
+## Flujo de Autenticación
+
+Registro: POST /api/registry con {email, password, role?} (default 'user'). Hash de password y chequeo de admin único.
+
+Login: POST /api/login con {email, password} → Devuelve access_token (1h) y refresh_token (14 días). Rol en claims.
+
+Uso: Headers Authorization: Bearer <access_token> en rutas protegidas. @jwt_required() verifica token; role_required() chequea rol.
+
+Refresh: POST /api/refresh con refresh_token → Nuevo access_token.
+
+Logout: POST /api/logout → Invalida token en blacklist (memoria; prod: Redis).
+
+Expiración: Access 1h; refresh 14d. Frontend guarda en localStorage y redirige post-login.
+
+## Tabla de Endpoints
+
+| Método | Endpoint                  | Descripción                          | Autenticación | Rol Requerido | Ejemplo de Body |
+|--------|---------------------------|--------------------------------------|---------------|---------------|-----------------|
+| POST   | /api/registry            | Registro de usuario                  | No            | -             | `{"email": "test@test.com", "password": "pass", "role": "admin"}` |
+| POST   | /api/login               | Login y tokens JWT                   | No            | -             | `{"email": "test@test.com", "password": "pass"}` |
+| POST   | /api/refresh             | Renovar access_token                 | Refresh Token | -             | (Usa refresh en header) |
+| POST   | /api/logout              | Cierre de sesión (invalida token)    | Sí (JWT)      | -             | - |
+| GET    | /api/players             | Lista todos los jugadores            | Sí (JWT)      | user          | - |
+| GET    | /api/players/<id>        | Detalle de un jugador                | Sí (JWT)      | user          | - |
+| POST   | /api/players             | Crear jugador                        | Sí (JWT)      | admin         | `{"name": "Messi", "position": "Delantero", "team": "Miami", "birth_date": "1987-06-24"}` |
+| PUT    | /api/players/<id>        | Actualizar jugador                   | Sí (JWT)      | admin         | Igual que POST |
+| DELETE | /api/players/<id>        | Eliminar jugador                     | Sí (JWT)      | admin         | - |
+| GET    | /api/users               | Lista usuarios (admin only)          | Sí (JWT)      | admin         | - |
+| GET    | /api/users/<id>          | Detalle usuario                      | Sí (JWT)      | -             | - |
+| PUT    | /api/users/<id>          | Actualizar usuario                   | Sí (JWT)      | admin         | `{"email": "new@test.com", "password": "newpass"}` |
+| DELETE | /api/users/<id>          | Eliminar usuario                     | Sí (JWT)      | admin         | - |
+
+**Notas**: Todos los cuerpos son JSON. Errores comunes: 400 (datos inválidos), 401 (no autenticado), 403 (rol insuficiente), 404 (no encontrado).
