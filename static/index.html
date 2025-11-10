@@ -100,6 +100,60 @@
     #horariosTable td {
       word-break: break-word;
     }
+    .table-controls {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 15px;
+      flex-wrap: wrap;
+    }
+    .table-controls input,
+    .table-controls select {
+      padding: 8px 12px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 14px;
+    }
+    .table-controls input::placeholder {
+      color: #999;
+    }
+    .table-controls input[type="search"] {
+      flex: 1;
+      min-width: 200px;
+    }
+    th.sortable {
+      cursor: pointer;
+      user-select: none;
+      position: relative;
+    }
+    th.sortable:hover {
+      background: linear-gradient(45deg, #2c7a7b, #24656a);
+    }
+    th.sortable::after {
+      content: ' ↕️';
+      font-size: 12px;
+    }
+    th.sortable.sorted-asc::after {
+      content: ' ↑';
+      font-size: 12px;
+    }
+    th.sortable.sorted-desc::after {
+      content: ' ↓';
+      font-size: 12px;
+    }
+    tr.assigned {
+      background-color: #f0fdf4;
+      border-left: 4px solid #22c55e;
+    }
+    tr.assigned:hover {
+      background-color: #dcfce7;
+    }
+    tr.unassigned {
+      background-color: #fef3f2;
+      border-left: 4px solid #ef4444;
+    }
+    tr.unassigned:hover {
+      background-color: #fee2e2;
+    }
     #roleInfo {
       background: #e6fffa;
       padding: 10px;
@@ -230,10 +284,32 @@
 
       <!-- Tabla de todos los horarios para admin -->
       <h3 style="margin-top: 40px;">📋 Todos los Horarios</h3>
+      
+      <!-- Controles de búsqueda y filtro -->
+      <div class="table-controls">
+        <input type="search" id="searchHorarios" placeholder="🔍 Buscar por materia, docente, usuario...">
+        <select id="filterUsuario">
+          <option value="">Filtrar por Usuario (Todos)</option>
+        </select>
+        <select id="filterDia">
+          <option value="">Filtrar por Día (Todos)</option>
+          <option>Lunes</option><option>Martes</option><option>Miércoles</option>
+          <option>Jueves</option><option>Viernes</option><option>Sábado</option>
+        </select>
+      </div>
+
       <table id="horariosTable">
         <thead>
           <tr>
-            <th>ID</th><th>Día</th><th>Inicio</th><th>Fin</th><th>Materia</th><th>Docente</th><th>Salón</th><th>Usuario</th><th>Acciones</th>
+            <th class="sortable" data-column="id">ID</th>
+            <th class="sortable" data-column="dia">Día</th>
+            <th class="sortable" data-column="hora_inicio">Inicio</th>
+            <th class="sortable" data-column="hora_fin">Fin</th>
+            <th class="sortable" data-column="materia">Materia</th>
+            <th class="sortable" data-column="docente">Docente</th>
+            <th class="sortable" data-column="salon">Salón</th>
+            <th class="sortable" data-column="usuario">Usuario</th>
+            <th>Acciones</th>
           </tr>
         </thead>
         <tbody></tbody>
@@ -459,6 +535,9 @@
     }
   }
 
+  let horariosData = []; // Guardar datos para búsqueda y filtro
+  let currentSort = { column: null, direction: 'asc' };
+
   async function loadHorarios(role) {
     // Obtener token actualizado desde localStorage
     const currentToken = localStorage.getItem('token');
@@ -480,38 +559,9 @@
         } 
       });
       if (res.ok) {
-        const data = await res.json();
-        const tbody = document.querySelector('#horariosTable tbody');
-        if (tbody) {
-          tbody.innerHTML = data.map(h => {
-            return `
-            <tr>
-              <td>${h.id}</td><td>${h.dia}</td><td>${h.hora_inicio}</td>
-              <td>${h.hora_fin}</td><td>${h.materia}</td><td>${h.docente}</td><td>${h.salon || ''}</td>
-              <td>${h.usuario || 'Sin asignar'}</td>
-              <td>
-                <button class="btn-edit" data-id="${h.id}" data-dia="${h.dia}" data-inicio="${h.hora_inicio}" data-fin="${h.hora_fin}" data-materia="${h.materia}" data-docente="${h.docente}" data-salon="${h.salon || ''}" data-user-id="${h.user_id || ''}">✏️ Editar</button>
-                <button class="btn-delete" onclick="deleteHorario(${h.id})">🗑️ Eliminar</button>
-              </td>
-            </tr>`;
-          }).join('');
-          
-          // Agregar event listeners a los botones editar
-          document.querySelectorAll('#horariosTable .btn-edit').forEach(btn => {
-            btn.addEventListener('click', function() {
-              abrirModalEditarAdmin(
-                this.dataset.id,
-                this.dataset.dia,
-                this.dataset.inicio,
-                this.dataset.fin,
-                this.dataset.materia,
-                this.dataset.docente,
-                this.dataset.salon,
-                this.dataset.userId ? parseInt(this.dataset.userId) : null
-              );
-            });
-          });
-        }
+        horariosData = await res.json(); // Guardar datos originales
+        renderHorarios(horariosData);
+        actualizarFiltroUsuarios();
       } else {
         const errorData = await res.json().catch(() => ({ error: 'Error desconocido' }));
         console.error('Error cargando horarios:', res.status, errorData);
@@ -533,6 +583,136 @@
       }
     }
   }
+
+  function renderHorarios(data) {
+    const tbody = document.querySelector('#horariosTable tbody');
+    if (!tbody) return;
+
+    if (data.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; color: #999;">No hay horarios registrados</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = data.map(h => {
+      const rowClass = h.user_id ? 'assigned' : 'unassigned';
+      return `
+        <tr class="${rowClass}">
+          <td>${h.id}</td>
+          <td>${h.dia}</td>
+          <td>${h.hora_inicio}</td>
+          <td>${h.hora_fin}</td>
+          <td>${h.materia}</td>
+          <td>${h.docente}</td>
+          <td>${h.salon || ''}</td>
+          <td>${h.usuario || 'Sin asignar'}</td>
+          <td>
+            <button class="btn-edit" data-id="${h.id}" data-dia="${h.dia}" data-inicio="${h.hora_inicio}" data-fin="${h.hora_fin}" data-materia="${h.materia}" data-docente="${h.docente}" data-salon="${h.salon || ''}" data-user-id="${h.user_id || ''}">✏️ Editar</button>
+            <button class="btn-delete" onclick="deleteHorario(${h.id})">🗑️ Eliminar</button>
+          </td>
+        </tr>`;
+    }).join('');
+    
+    // Agregar event listeners a los botones editar
+    document.querySelectorAll('#horariosTable .btn-edit').forEach(btn => {
+      btn.addEventListener('click', function() {
+        abrirModalEditarAdmin(
+          this.dataset.id,
+          this.dataset.dia,
+          this.dataset.inicio,
+          this.dataset.fin,
+          this.dataset.materia,
+          this.dataset.docente,
+          this.dataset.salon,
+          this.dataset.userId ? parseInt(this.dataset.userId) : null
+        );
+      });
+    });
+  }
+
+  function actualizarFiltroUsuarios() {
+    const filterUsuario = document.getElementById('filterUsuario');
+    const usuarios = new Set();
+    horariosData.forEach(h => {
+      if (h.user_id && h.usuario && h.usuario !== 'Sin asignar') {
+        usuarios.add(JSON.stringify({ id: h.user_id, email: h.usuario }));
+      }
+    });
+    
+    const usuariosUnicos = Array.from(usuarios).map(u => JSON.parse(u));
+    filterUsuario.innerHTML = '<option value="">Filtrar por Usuario (Todos)</option>' +
+      usuariosUnicos.map(u => `<option value="${u.id}">${u.email}</option>`).join('');
+  }
+
+  function filtrarYBuscar() {
+    const search = document.getElementById('searchHorarios').value.toLowerCase();
+    const filterUsuario = document.getElementById('filterUsuario').value;
+    const filterDia = document.getElementById('filterDia').value;
+
+    let filtered = horariosData.filter(h => {
+      const matchSearch = search === '' || 
+        h.materia.toLowerCase().includes(search) ||
+        h.docente.toLowerCase().includes(search) ||
+        (h.usuario && h.usuario.toLowerCase().includes(search));
+      
+      const matchUsuario = filterUsuario === '' || h.user_id == filterUsuario;
+      const matchDia = filterDia === '' || h.dia === filterDia;
+      
+      return matchSearch && matchUsuario && matchDia;
+    });
+
+    if (currentSort.column) {
+      filtered = ordenarHorarios(filtered, currentSort.column, currentSort.direction);
+    }
+
+    renderHorarios(filtered);
+  }
+
+  function ordenarHorarios(data, column, direction) {
+    return [...data].sort((a, b) => {
+      let aVal = a[column] || '';
+      let bVal = b[column] || '';
+      
+      // Convertir a números si es ID o hora
+      if (column === 'id' || column.includes('hora')) {
+        aVal = isNaN(aVal) ? aVal : parseFloat(aVal);
+        bVal = isNaN(bVal) ? bVal : parseFloat(bVal);
+      } else {
+        aVal = String(aVal).toLowerCase();
+        bVal = String(bVal).toLowerCase();
+      }
+      
+      if (direction === 'asc') {
+        return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
+      } else {
+        return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
+      }
+    });
+  }
+
+  // Event listeners para búsqueda y filtro
+  document.getElementById('searchHorarios').addEventListener('input', filtrarYBuscar);
+  document.getElementById('filterUsuario').addEventListener('change', filtrarYBuscar);
+  document.getElementById('filterDia').addEventListener('change', filtrarYBuscar);
+
+  // Event listeners para ordenamiento
+  document.querySelectorAll('#horariosTable th.sortable').forEach(th => {
+    th.addEventListener('click', function() {
+      const column = this.dataset.column;
+      const isCurrentSort = currentSort.column === column;
+      
+      // Cambiar dirección si es la misma columna
+      currentSort.direction = isCurrentSort && currentSort.direction === 'asc' ? 'desc' : 'asc';
+      currentSort.column = column;
+      
+      // Actualizar clases visuales
+      document.querySelectorAll('#horariosTable th.sortable').forEach(th => {
+        th.classList.remove('sorted-asc', 'sorted-desc');
+      });
+      this.classList.add(`sorted-${currentSort.direction}`);
+      
+      filtrarYBuscar();
+    });
+  });
 
   createForm.addEventListener('submit', async e => {
     e.preventDefault();
