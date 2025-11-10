@@ -98,6 +98,7 @@ def create_horario():
     hora_inicio = data.get('hora_inicio')
     hora_fin = data.get('hora_fin')
     salon = data.get('salon')
+    user_id = data.get('user_id')  # Nuevo: aceptar user_id opcional
 
     if not all([materia, docente, dia, hora_inicio, hora_fin, salon]):
         logger.warning("Intento de crear horario sin datos completos")
@@ -105,10 +106,20 @@ def create_horario():
 
     db = next(get_db_session())
     service = HorarioService(db)
+    user_service = UserService(db)
+    
     try:
-        # Crear horario sin asignar usuario (user_id será None)
-        horario = service.crear_horario(materia, docente, dia, hora_inicio, hora_fin, salon, None)
-        logger.info(f"Horario creado: {materia} - {docente}")
+        # Validar que el usuario existe si se proporciona user_id
+        if user_id:
+            user_id = int(user_id) if isinstance(user_id, str) else user_id
+            usuario = user_service.obtener_usuario_por_id(user_id)
+            if not usuario:
+                logger.warning(f"Intento de asignar horario a usuario inexistente: {user_id}")
+                return jsonify({'error': f'El usuario con ID {user_id} no existe'}), 400, {'Content-Type': 'application/json; charset=utf-8'}
+        
+        # Crear horario con el user_id proporcionado (puede ser None)
+        horario = service.crear_horario(materia, docente, dia, hora_inicio, hora_fin, salon, user_id)
+        logger.info(f"Horario creado: {materia} - {docente} (asignado a usuario: {user_id if user_id else 'Sin asignar'})")
         return jsonify({
             'id': horario.id,
             'materia': horario.materia,
@@ -116,7 +127,8 @@ def create_horario():
             'dia': horario.dia,
             'hora_inicio': str(horario.hora_inicio) if horario.hora_inicio else None,
             'hora_fin': str(horario.hora_fin) if horario.hora_fin else None,
-            'salon': horario.salon
+            'salon': horario.salon,
+            'user_id': horario.user_id
         }), 201, {'Content-Type': 'application/json; charset=utf-8'}
     except Exception as e:
         logger.error(f"Error al crear horario: {str(e)}", exc_info=True)
@@ -138,19 +150,33 @@ def update_horario(horario_id):
     hora_inicio = data.get('hora_inicio')
     hora_fin = data.get('hora_fin')
     salon = data.get('salon')
+    user_id = data.get('user_id')  # Nuevo: aceptar user_id opcional
 
     db = next(get_db_session())
     service = HorarioService(db)
+    user_service = UserService(db)
+    
     try:
-        # Obtener horario actual para mantener su user_id
+        # Obtener horario actual
         horario_actual = service.obtener_horario(horario_id)
         if not horario_actual:
             logger.warning(f"Horario no encontrado para actualizar: {horario_id}")
             return jsonify({'error': 'Horario no encontrado'}), 404, {'Content-Type': 'application/json; charset=utf-8'}
         
-        # Actualizar horario manteniendo el user_id existente
-        horario = service.actualizar_horario(horario_id, materia, docente, dia, hora_inicio, hora_fin, salon, horario_actual.user_id)
-        logger.info(f"Horario actualizado por admin: {horario_id}")
+        # Si se proporciona user_id, validar que el usuario existe
+        if user_id is not None:
+            user_id = int(user_id) if isinstance(user_id, str) else user_id
+            usuario = user_service.obtener_usuario_por_id(user_id)
+            if not usuario:
+                logger.warning(f"Intento de asignar horario a usuario inexistente: {user_id}")
+                return jsonify({'error': f'El usuario con ID {user_id} no existe'}), 400, {'Content-Type': 'application/json; charset=utf-8'}
+        else:
+            # Si no se proporciona user_id, mantener el existente
+            user_id = horario_actual.user_id
+        
+        # Actualizar horario con el nuevo user_id
+        horario = service.actualizar_horario(horario_id, materia, docente, dia, hora_inicio, hora_fin, salon, user_id)
+        logger.info(f"Horario actualizado por admin: {horario_id} (usuario asignado: {user_id if user_id else 'Sin asignar'})")
         return jsonify({
             'id': horario.id,
             'materia': horario.materia,

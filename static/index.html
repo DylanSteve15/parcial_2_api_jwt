@@ -86,6 +86,20 @@
     tr:hover {
       background: #f7fafc;
     }
+    #createSection {
+      margin-top: 20px;
+    }
+    #createSection > h3:last-of-type {
+      margin-top: 40px;
+      border-top: 2px solid #e2e8f0;
+      padding-top: 20px;
+    }
+    #horariosTable {
+      font-size: 14px;
+    }
+    #horariosTable td {
+      word-break: break-word;
+    }
     #roleInfo {
       background: #e6fffa;
       padding: 10px;
@@ -196,8 +210,11 @@
 
     <!-- Sección de horarios para admin -->
     <div id="createSection" class="admin-only">
-      <h3>Crear Nuevo Horario (Disponible para todos)</h3>
+      <h3>Crear Nuevo Horario</h3>
       <form id="createForm">
+        <select id="userSelect">
+          <option value="">Seleccionar Usuario (Opcional)</option>
+        </select>
         <select id="dia" required>
           <option value="">Día</option>
           <option>Lunes</option><option>Martes</option><option>Miércoles</option>
@@ -210,6 +227,17 @@
         <input type="text" id="salon" placeholder="Salón" required>
         <button type="submit">Guardar Horario</button>
       </form>
+
+      <!-- Tabla de todos los horarios para admin -->
+      <h3 style="margin-top: 40px;">📋 Todos los Horarios</h3>
+      <table id="horariosTable">
+        <thead>
+          <tr>
+            <th>ID</th><th>Día</th><th>Inicio</th><th>Fin</th><th>Materia</th><th>Docente</th><th>Salón</th><th>Usuario</th><th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
     </div>
 
     <!-- Sección de mis horarios (para usuarios no-admin) -->
@@ -245,15 +273,6 @@
       </table>
       <p id="sinHorarios" style="text-align: center; color: #999;">No tienes horarios registrados</p>
     </div>
-
-    <table id="horariosTable" class="admin-only">
-      <thead>
-        <tr>
-          <th>ID</th><th>Día</th><th>Inicio</th><th>Fin</th><th>Materia</th><th>Docente</th><th>Salón</th><th>Usuario</th><th>Acciones</th>
-        </tr>
-      </thead>
-      <tbody></tbody>
-    </table>
   </div>
 </div>
 
@@ -264,6 +283,9 @@
     <h3>Editar Horario</h3>
     <form id="formEditarHorario">
       <input type="hidden" id="editHorarioId">
+      <select id="editUserSelect" style="display: none;">
+        <option value="">Seleccionar Usuario (Opcional)</option>
+      </select>
       <select id="editDia" required>
         <option value="">Día</option>
         <option>Lunes</option><option>Martes</option><option>Miércoles</option>
@@ -468,7 +490,7 @@
               <td>${h.hora_fin}</td><td>${h.materia}</td><td>${h.docente}</td><td>${h.salon || ''}</td>
               <td>${h.usuario || 'Sin asignar'}</td>
               <td>
-                <button class="btn-edit" data-id="${h.id}" data-dia="${h.dia}" data-inicio="${h.hora_inicio}" data-fin="${h.hora_fin}" data-materia="${h.materia}" data-docente="${h.docente}" data-salon="${h.salon || ''}">✏️ Editar</button>
+                <button class="btn-edit" data-id="${h.id}" data-dia="${h.dia}" data-inicio="${h.hora_inicio}" data-fin="${h.hora_fin}" data-materia="${h.materia}" data-docente="${h.docente}" data-salon="${h.salon || ''}" data-user-id="${h.user_id || ''}">✏️ Editar</button>
                 <button class="btn-delete" onclick="deleteHorario(${h.id})">🗑️ Eliminar</button>
               </td>
             </tr>`;
@@ -484,7 +506,8 @@
                 this.dataset.fin,
                 this.dataset.materia,
                 this.dataset.docente,
-                this.dataset.salon
+                this.dataset.salon,
+                this.dataset.userId ? parseInt(this.dataset.userId) : null
               );
             });
           });
@@ -529,7 +552,8 @@
       hora_fin: hora_fin.value, 
       materia: materia.value, 
       docente: docente.value, 
-      salon: salon.value
+      salon: salon.value,
+      user_id: userSelect.value ? parseInt(userSelect.value) : null  // Nuevo: incluir user_id
     };
     
     console.log('Enviando horario:', horario); // Debug
@@ -721,11 +745,12 @@
     document.getElementById('editMateria').value = materia;
     document.getElementById('editDocente').value = docente;
     document.getElementById('editSalon').value = salon;
+    document.getElementById('editUserSelect').style.display = 'none';
     document.getElementById('editModal').classList.add('active');
     document.getElementById('formEditarHorario').dataset.endpoint = '/api/mis-horarios';
   }
 
-  function abrirModalEditarAdmin(id, dia, horaInicio, horaFin, materia, docente, salon) {
+  function abrirModalEditarAdmin(id, dia, horaInicio, horaFin, materia, docente, salon, userId = null) {
     document.getElementById('editHorarioId').value = id;
     document.getElementById('editDia').value = dia;
     document.getElementById('editHoraInicio').value = horaInicio;
@@ -733,6 +758,17 @@
     document.getElementById('editMateria').value = materia;
     document.getElementById('editDocente').value = docente;
     document.getElementById('editSalon').value = salon;
+    
+    // Mostrar selector de usuario para admin
+    const editUserSelect = document.getElementById('editUserSelect');
+    editUserSelect.style.display = 'block';
+    // Establecer el usuario actual si existe
+    if (userId) {
+      editUserSelect.value = userId;
+    } else {
+      editUserSelect.value = '';
+    }
+    
     document.getElementById('editModal').classList.add('active');
     document.getElementById('formEditarHorario').dataset.endpoint = '/api/horarios';
   }
@@ -755,6 +791,14 @@
       docente: document.getElementById('editDocente').value,
       salon: document.getElementById('editSalon').value
     };
+    
+    // Si es admin, incluir user_id
+    const editUserSelect = document.getElementById('editUserSelect');
+    if (editUserSelect.style.display !== 'none' && editUserSelect.value) {
+      horario.user_id = parseInt(editUserSelect.value);
+    } else if (editUserSelect.style.display !== 'none') {
+      horario.user_id = null; // Sin asignar
+    }
 
     try {
       const res = await fetch(`${endpoint}/${horarioId}`, {
