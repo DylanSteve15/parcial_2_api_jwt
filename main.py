@@ -1,5 +1,7 @@
 # main.py
 from models.db import Base
+from models.user_model import User
+from models.horario_model import Horario
 from config.database import engine
 from flask import Flask, send_from_directory, jsonify
 from config.jwt import *
@@ -70,4 +72,4 @@ def index():
 if __name__ == "__main__":
     Base.metadata.create_all(engine)
     logger.info("Tablas creadas correctamente.")
-    app.run(debug=True)
+    app.run(debug=False, use_reloader=False)
