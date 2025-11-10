@@ -104,6 +104,46 @@
       display: none;
       animation: fadeIn 0.4s ease;
     }
+    .btn-delete { background: #e53e3e; }
+    .btn-edit { background: #d69e2e; }
+    .btn-delete:hover, .btn-edit:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+    }
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.5);
+      z-index: 1000;
+      justify-content: center;
+      align-items: center;
+    }
+    .modal.active {
+      display: flex;
+    }
+    .modal-content {
+      background: white;
+      padding: 30px;
+      border-radius: 15px;
+      width: 90%;
+      max-width: 500px;
+      box-shadow: 0 8px 25px rgba(0,0,0,0.2);
+    }
+    .modal-content h3 {
+      margin-top: 0;
+    }
+    .modal-close {
+      position: absolute;
+      top: 15px;
+      right: 15px;
+      font-size: 28px;
+      cursor: pointer;
+      color: #666;
+    }
     @keyframes fadeIn {
       from { opacity: 0; transform: translateY(10px); }
       to { opacity: 1; transform: translateY(0); }
@@ -154,8 +194,9 @@
       </form>
     </div>
 
+    <!-- Sección de horarios para admin -->
     <div id="createSection" class="admin-only">
-      <h3>Crear Nuevo Horario</h3>
+      <h3>Crear Nuevo Horario (Disponible para todos)</h3>
       <form id="createForm">
         <select id="dia" required>
           <option value="">Día</option>
@@ -171,14 +212,71 @@
       </form>
     </div>
 
-    <table id="horariosTable">
+    <!-- Sección de mis horarios (para usuarios no-admin) -->
+    <div id="misHorariosSection" style="display:none; margin-bottom: 20px; padding: 15px; background: #f7fafc; border-radius: 8px;">
+      <h3 style="margin-top: 0;">📚 Mis Horarios</h3>
+      <button type="button" id="btnCrearMiHorario" class="btn-secondary">+ Crear Mi Horario</button>
+      
+      <div id="formCrearHorario" style="margin-top: 15px; display: none; padding: 15px; background: white; border-radius: 8px; border: 1px solid #ddd;">
+        <h4>Nuevo Horario Personal</h4>
+        <form id="formMiHorario">
+          <select id="miDia" required>
+            <option value="">Día</option>
+            <option>Lunes</option><option>Martes</option><option>Miércoles</option>
+            <option>Jueves</option><option>Viernes</option><option>Sábado</option>
+          </select>
+          <input type="time" id="miHoraInicio" required>
+          <input type="time" id="miHoraFin" required>
+          <input type="text" id="miMateria" placeholder="Materia" required>
+          <input type="text" id="miDocente" placeholder="Docente" required>
+          <input type="text" id="miSalon" placeholder="Salón" required>
+          <button type="submit">Guardar</button>
+          <button type="button" onclick="document.getElementById('formCrearHorario').style.display='none'" class="btn-secondary">Cancelar</button>
+        </form>
+      </div>
+
+      <table id="misHorariosTable" style="margin-top: 15px; display: none;">
+        <thead>
+          <tr>
+            <th>Día</th><th>Inicio</th><th>Fin</th><th>Materia</th><th>Docente</th><th>Salón</th><th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <p id="sinHorarios" style="text-align: center; color: #999;">No tienes horarios registrados</p>
+    </div>
+
+    <table id="horariosTable" class="admin-only">
       <thead>
         <tr>
-          <th>ID</th><th>Día</th><th>Inicio</th><th>Fin</th><th>Materia</th><th>Docente</th><th>Salón</th><th class="admin-only">Acciones</th>
+          <th>ID</th><th>Día</th><th>Inicio</th><th>Fin</th><th>Materia</th><th>Docente</th><th>Salón</th><th>Usuario</th><th>Acciones</th>
         </tr>
       </thead>
       <tbody></tbody>
     </table>
+  </div>
+</div>
+
+<!-- Modal para editar horario -->
+<div id="editModal" class="modal">
+  <div class="modal-content">
+    <span class="modal-close" onclick="cerrarModalEditar()">&times;</span>
+    <h3>Editar Horario</h3>
+    <form id="formEditarHorario">
+      <input type="hidden" id="editHorarioId">
+      <select id="editDia" required>
+        <option value="">Día</option>
+        <option>Lunes</option><option>Martes</option><option>Miércoles</option>
+        <option>Jueves</option><option>Viernes</option><option>Sábado</option>
+      </select>
+      <input type="time" id="editHoraInicio" required>
+      <input type="time" id="editHoraFin" required>
+      <input type="text" id="editMateria" placeholder="Materia" required>
+      <input type="text" id="editDocente" placeholder="Docente" required>
+      <input type="text" id="editSalon" placeholder="Salón" required>
+      <button type="submit">Guardar Cambios</button>
+      <button type="button" onclick="cerrarModalEditar()" class="btn-secondary">Cancelar</button>
+    </form>
   </div>
 </div>
 
@@ -294,6 +392,7 @@
   function toggleAdmin(show) {
     document.querySelectorAll('.admin-only').forEach(el => el.style.display = show ? '' : 'none');
     document.getElementById('createSection').style.display = show ? 'block' : 'none';
+    document.getElementById('misHorariosSection').style.display = !show ? 'block' : 'none';
   }
 
   let usersList = [];
@@ -345,7 +444,7 @@
       console.warn('No hay token disponible para cargar horarios');
       const tbody = document.querySelector('#horariosTable tbody');
       if (tbody) {
-        tbody.innerHTML = '<tr><td colspan="7">No hay sesión activa</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9">No hay sesión activa</td></tr>';
       }
       return;
     }
@@ -367,9 +466,28 @@
             <tr>
               <td>${h.id}</td><td>${h.dia}</td><td>${h.hora_inicio}</td>
               <td>${h.hora_fin}</td><td>${h.materia}</td><td>${h.docente}</td><td>${h.salon || ''}</td>
-              ${role === 'admin' ? `<td><button class="btn-secondary" onclick="deleteHorario(${h.id})">🗑️</button></td>` : ''}
+              <td>${h.usuario || 'Sin asignar'}</td>
+              <td>
+                <button class="btn-edit" data-id="${h.id}" data-dia="${h.dia}" data-inicio="${h.hora_inicio}" data-fin="${h.hora_fin}" data-materia="${h.materia}" data-docente="${h.docente}" data-salon="${h.salon || ''}">✏️ Editar</button>
+                <button class="btn-delete" onclick="deleteHorario(${h.id})">🗑️ Eliminar</button>
+              </td>
             </tr>`;
           }).join('');
+          
+          // Agregar event listeners a los botones editar
+          document.querySelectorAll('#horariosTable .btn-edit').forEach(btn => {
+            btn.addEventListener('click', function() {
+              abrirModalEditarAdmin(
+                this.dataset.id,
+                this.dataset.dia,
+                this.dataset.inicio,
+                this.dataset.fin,
+                this.dataset.materia,
+                this.dataset.docente,
+                this.dataset.salon
+              );
+            });
+          });
         }
       } else {
         const errorData = await res.json().catch(() => ({ error: 'Error desconocido' }));
@@ -377,11 +495,10 @@
         const tbody = document.querySelector('#horariosTable tbody');
         if (tbody) {
           if (res.status === 401 || res.status === 422) {
-            // Token inválido o expirado - mostrar mensaje pero no recargar inmediatamente
-            tbody.innerHTML = '<tr><td colspan="7">Error de autenticación. Por favor, recarga la página.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="9">Error de autenticación. Por favor, recarga la página.</td></tr>';
             console.warn('Token inválido detectado, pero no recargando automáticamente');
           } else {
-            tbody.innerHTML = '<tr><td colspan="7">Error al cargar horarios</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="9">Error al cargar horarios</td></tr>';
           }
         }
       }
@@ -389,7 +506,7 @@
       console.error('Error cargando horarios:', error);
       const tbody = document.querySelector('#horariosTable tbody');
       if (tbody) {
-        tbody.innerHTML = '<tr><td colspan="7">Error de conexión</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9">Error de conexión</td></tr>';
       }
     }
   }
@@ -489,6 +606,220 @@
     showToast(res.ok ? 'Horario eliminado' : 'Error al eliminar', res.ok ? '#38a169' : '#e53e3e');
     loadHorarios(currentRole);
   }
+
+  // Funciones para mis horarios (usuarios no-admin)
+  document.getElementById('btnCrearMiHorario').addEventListener('click', () => {
+    const form = document.getElementById('formCrearHorario');
+    form.style.display = form.style.display === 'none' ? 'block' : 'none';
+  });
+
+  document.getElementById('formMiHorario').addEventListener('submit', async e => {
+    e.preventDefault();
+    const currentToken = localStorage.getItem('token');
+    const horario = {
+      dia: document.getElementById('miDia').value,
+      hora_inicio: document.getElementById('miHoraInicio').value,
+      hora_fin: document.getElementById('miHoraFin').value,
+      materia: document.getElementById('miMateria').value,
+      docente: document.getElementById('miDocente').value,
+      salon: document.getElementById('miSalon').value
+    };
+    
+    try {
+      const res = await fetch('/api/mis-horarios', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${currentToken}`
+        },
+        body: JSON.stringify(horario)
+      });
+      
+      if (res.ok) {
+        showToast('✅ Horario creado correctamente', '#38a169');
+        e.target.reset();
+        document.getElementById('formCrearHorario').style.display = 'none';
+        cargarMisHorarios();
+      } else {
+        const error = await res.json();
+        showToast(`Error: ${error.error || 'Error al crear horario'}`, '#e53e3e');
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      showToast('Error de conexión', '#e53e3e');
+    }
+  });
+
+  async function cargarMisHorarios() {
+    const currentToken = localStorage.getItem('token');
+    if (!currentToken || currentToken === 'null' || currentToken.trim() === '') {
+      console.warn('No hay token para cargar mis horarios');
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/mis-horarios', {
+        headers: {
+          'Authorization': `Bearer ${currentToken}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (res.ok) {
+        const horarios = await res.json();
+        const tbody = document.querySelector('#misHorariosTable tbody');
+        const tabla = document.getElementById('misHorariosTable');
+        const sinHorarios = document.getElementById('sinHorarios');
+
+        if (horarios.length === 0) {
+          tabla.style.display = 'none';
+          sinHorarios.style.display = 'block';
+        } else {
+          tabla.style.display = 'table';
+          sinHorarios.style.display = 'none';
+          tbody.innerHTML = horarios.map(h => `
+            <tr>
+              <td>${h.dia}</td>
+              <td>${h.hora_inicio}</td>
+              <td>${h.hora_fin}</td>
+              <td>${h.materia}</td>
+              <td>${h.docente}</td>
+              <td>${h.salon || ''}</td>
+              <td>
+                <button class="btn-edit" data-id="${h.id}" data-dia="${h.dia}" data-inicio="${h.hora_inicio}" data-fin="${h.hora_fin}" data-materia="${h.materia}" data-docente="${h.docente}" data-salon="${h.salon || ''}">✏️ Editar</button>
+                <button class="btn-delete" onclick="eliminarMiHorario(${h.id})">🗑️ Eliminar</button>
+              </td>
+            </tr>
+          `).join('');
+          
+          // Agregar event listeners a los botones editar
+          document.querySelectorAll('#misHorariosTable .btn-edit').forEach(btn => {
+            btn.addEventListener('click', function() {
+              abrirModalEditar(
+                this.dataset.id,
+                this.dataset.dia,
+                this.dataset.inicio,
+                this.dataset.fin,
+                this.dataset.materia,
+                this.dataset.docente,
+                this.dataset.salon
+              );
+            });
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error cargando mis horarios:', error);
+    }
+  }
+
+  function abrirModalEditar(id, dia, horaInicio, horaFin, materia, docente, salon) {
+    document.getElementById('editHorarioId').value = id;
+    document.getElementById('editDia').value = dia;
+    document.getElementById('editHoraInicio').value = horaInicio;
+    document.getElementById('editHoraFin').value = horaFin;
+    document.getElementById('editMateria').value = materia;
+    document.getElementById('editDocente').value = docente;
+    document.getElementById('editSalon').value = salon;
+    document.getElementById('editModal').classList.add('active');
+    document.getElementById('formEditarHorario').dataset.endpoint = '/api/mis-horarios';
+  }
+
+  function abrirModalEditarAdmin(id, dia, horaInicio, horaFin, materia, docente, salon) {
+    document.getElementById('editHorarioId').value = id;
+    document.getElementById('editDia').value = dia;
+    document.getElementById('editHoraInicio').value = horaInicio;
+    document.getElementById('editHoraFin').value = horaFin;
+    document.getElementById('editMateria').value = materia;
+    document.getElementById('editDocente').value = docente;
+    document.getElementById('editSalon').value = salon;
+    document.getElementById('editModal').classList.add('active');
+    document.getElementById('formEditarHorario').dataset.endpoint = '/api/horarios';
+  }
+
+  function cerrarModalEditar() {
+    document.getElementById('editModal').classList.remove('active');
+  }
+
+  document.getElementById('formEditarHorario').addEventListener('submit', async e => {
+    e.preventDefault();
+    const currentToken = localStorage.getItem('token');
+    const horarioId = document.getElementById('editHorarioId').value;
+    const endpoint = document.getElementById('formEditarHorario').dataset.endpoint || '/api/mis-horarios';
+    
+    const horario = {
+      dia: document.getElementById('editDia').value,
+      hora_inicio: document.getElementById('editHoraInicio').value,
+      hora_fin: document.getElementById('editHoraFin').value,
+      materia: document.getElementById('editMateria').value,
+      docente: document.getElementById('editDocente').value,
+      salon: document.getElementById('editSalon').value
+    };
+
+    try {
+      const res = await fetch(`${endpoint}/${horarioId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${currentToken}`
+        },
+        body: JSON.stringify(horario)
+      });
+
+      if (res.ok) {
+        showToast('✅ Horario actualizado correctamente', '#38a169');
+        cerrarModalEditar();
+        if (endpoint === '/api/mis-horarios') {
+          cargarMisHorarios();
+        } else {
+          loadHorarios(currentRole);
+        }
+      } else {
+        const error = await res.json();
+        showToast(`Error: ${error.error || 'Error al actualizar horario'}`, '#e53e3e');
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      showToast('Error de conexión', '#e53e3e');
+    }
+  });
+
+  async function eliminarMiHorario(id) {
+    if (!confirm('¿Eliminar este horario?')) return;
+    
+    const currentToken = localStorage.getItem('token');
+    try {
+      const res = await fetch(`/api/mis-horarios/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${currentToken}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (res.ok) {
+        showToast('✅ Horario eliminado correctamente', '#38a169');
+        cargarMisHorarios();
+      } else {
+        const error = await res.json();
+        showToast(`Error: ${error.error || 'Error al eliminar horario'}`, '#e53e3e');
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      showToast('Error de conexión', '#e53e3e');
+    }
+  }
+
+  // Actualizar loadCRUD para cargar mis horarios
+  const originalShowCRUD = showCRUD;
+  showCRUD = function(role) {
+    originalShowCRUD(role);
+    if (role !== 'admin') {
+      setTimeout(() => {
+        cargarMisHorarios();
+      }, 200);
+    }
+  };
 
   logout.onclick = () => {
     localStorage.clear();

@@ -20,6 +20,10 @@ class HorarioService:
         logger.info(f"Obteniendo horario por ID: {horario_id}")
         return self.repository.get_horario_by_id(horario_id)
 
+    def obtener_horarios_por_usuario(self, user_id: int):
+        logger.info(f"Obteniendo horarios del usuario: {user_id}")
+        return self.repository.get_horarios_by_user(user_id)
+
     def crear_horario(self, materia: str, docente: str, dia: str, hora_inicio: str, hora_fin: str, salon: str, user_id: int = None):
         logger.info(f"Creando horario para la materia: {materia}")
         return self.repository.create_horario(materia, docente, dia, hora_inicio, hora_fin, salon, user_id)

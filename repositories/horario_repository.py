@@ -25,6 +25,11 @@ class HorarioRepository:
         logger.info(f"Buscando horario por ID: {horario_id}")
         return self.db.query(Horario).filter(Horario.id == horario_id).first()
 
+    def get_horarios_by_user(self, user_id: int):
+        """Obtiene todos los horarios asignados a un usuario específico."""
+        logger.info(f"Obteniendo horarios del usuario: {user_id}")
+        return self.db.query(Horario).filter(Horario.user_id == user_id).all()
+
     def create_horario(self, materia: str, docente: str, dia: str, hora_inicio: str, hora_fin: str, salon: str, user_id: int = None):
         """
         Crea un nuevo horario en la base de datos.

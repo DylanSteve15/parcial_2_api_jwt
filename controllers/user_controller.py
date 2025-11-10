@@ -233,20 +233,51 @@ def get_user(user_id):
 
 
 @user_bp.route("/users/<int:user_id>", methods=["PUT"])
-@role_required("admin")
+@jwt_required()
 def update_user(user_id):
+    """
+    Actualiza un usuario.
+    - Un usuario puede editar su propio perfil (email y password)
+    - Solo un admin puede cambiar el rol de un usuario
+    - Un admin puede editar cualquier usuario
+    """
     data = request.get_json()
+    current_user_id = get_jwt_identity()
+    current_user_id = int(current_user_id) if isinstance(current_user_id, str) else current_user_id
+    
     db = next(get_db_session())
     service = UserService(db)
     try:
+        # Obtener el usuario actual para verificar su rol
+        current_user = service.obtener_usuario_por_id(current_user_id)
+        is_admin = current_user and current_user.role == "admin"
+        
+        # Verificar permisos: solo admin o el mismo usuario puede editar
+        if current_user_id != user_id and not is_admin:
+            logger.warning(f"Acceso denegado: usuario {current_user_id} intenta editar a {user_id}")
+            return jsonify({"error": "Solo puedes editar tu propio perfil o ser administrador"}), 403
+        
+        # Si no es admin, no puede cambiar el rol
+        if not is_admin and data.get("role"):
+            logger.warning(f"Intento no autorizado de cambiar rol por usuario {current_user_id}")
+            return jsonify({"error": "No tienes permisos para cambiar roles"}), 403
+        
         updated = service.actualizar_usuario(
             user_id,
             email=data.get("email"),
             password=data.get("password"),
-            role=data.get("role")
+            role=data.get("role") if is_admin else None
         )
         if updated:
-            return jsonify({"message": "Usuario actualizado correctamente"}), 200
+            logger.info(f"Usuario {user_id} actualizado por {current_user_id}")
+            return jsonify({
+                "message": "Usuario actualizado correctamente",
+                "user": {
+                    "id": updated.id,
+                    "email": updated.email,
+                    "role": updated.role
+                }
+            }), 200
         return jsonify({"error": "Usuario no encontrado"}), 404
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
