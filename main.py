@@ -1,7 +1,7 @@
 # main.py
 from models.db import Base
 from config.database import engine
-from flask import Flask, send_from_directory
+from flask import Flask, send_from_directory, jsonify
 from config.jwt import *
 from controllers.user_controller import user_bp, register_jwt_error_handlers
 from controllers.horario_controller import horario_bp
@@ -37,6 +37,22 @@ app.config['JWT_HEADER_NAME'] = JWT_HEADER_NAME
 app.config['JWT_HEADER_TYPE'] = JWT_HEADER_TYPE
 
 jwt = JWTManager(app)
+
+# Callbacks de JWT para debugging
+@jwt.expired_token_loader
+def expired_token_callback(jwt_header, jwt_payload):
+    logger.warning(f"Token expirado: {jwt_payload}")
+    return jsonify({'error': 'Token expirado'}), 401
+
+@jwt.invalid_token_loader
+def invalid_token_callback(error):
+    logger.warning(f"Token inválido: {error}")
+    return jsonify({'error': f'Token inválido: {str(error)}'}), 422
+
+@jwt.unauthorized_loader
+def unauthorized_callback(error):
+    logger.warning(f"No autorizado: {error}")
+    return jsonify({'error': f'No autorizado: {str(error)}'}), 401
 
 # Registrar Blueprints
 app.register_blueprint(user_bp, url_prefix='/api')

@@ -144,7 +144,18 @@
     <button id="logout" class="btn-secondary" style="float:right;">Cerrar Sesión</button>
     <br><br>
 
+    <!-- Sección de registro de usuarios (solo admin) -->
+    <div id="registerUserSection" class="admin-only" style="margin-bottom: 20px; padding: 15px; background: #f7fafc; border-radius: 8px;">
+      <h3 style="margin-top: 0;">Registrar Nuevo Usuario</h3>
+      <form id="registerUserForm">
+        <input type="email" id="newUserEmail" placeholder="Correo electrónico" required>
+        <input type="password" id="newUserPassword" placeholder="Contraseña" required>
+        <button type="submit">Registrar Usuario</button>
+      </form>
+    </div>
+
     <div id="createSection" class="admin-only">
+      <h3>Crear Nuevo Horario</h3>
       <form id="createForm">
         <select id="dia" required>
           <option value="">Día</option>
@@ -154,7 +165,8 @@
         <input type="time" id="hora_inicio" required>
         <input type="time" id="hora_fin" required>
         <input type="text" id="materia" placeholder="Materia" required>
-        <input type="text" id="profesor" placeholder="Profesor" required>
+        <input type="text" id="docente" placeholder="Docente" required>
+        <input type="text" id="salon" placeholder="Salón" required>
         <button type="submit">Guardar Horario</button>
       </form>
     </div>
@@ -162,7 +174,7 @@
     <table id="horariosTable">
       <thead>
         <tr>
-          <th>ID</th><th>Día</th><th>Inicio</th><th>Fin</th><th>Materia</th><th>Profesor</th><th class="admin-only">Acciones</th>
+          <th>ID</th><th>Día</th><th>Inicio</th><th>Fin</th><th>Materia</th><th>Docente</th><th>Salón</th><th class="admin-only">Acciones</th>
         </tr>
       </thead>
       <tbody></tbody>
@@ -177,7 +189,16 @@
   let token = localStorage.getItem('token');
   let currentRole = localStorage.getItem('role');
 
-  if (token && currentRole) showCRUD(currentRole);
+  // Validar que el token no sea null, undefined o string vacío
+  if (token && token !== 'null' && token !== 'undefined' && token.trim() !== '' && currentRole) {
+    // Verificar que el token tenga el formato correcto (debe tener 3 partes separadas por puntos)
+    if (token.split('.').length === 3) {
+      showCRUD(currentRole);
+    } else {
+      console.warn('Token con formato inválido, limpiando localStorage');
+      localStorage.clear();
+    }
+  }
 
   function decodeToken(token) {
     try { return JSON.parse(atob(token.split('.')[1])).role; }
@@ -195,18 +216,42 @@
   // LOGIN
   document.getElementById('loginForm').addEventListener('submit', async e => {
     e.preventDefault();
-    const res = await fetch('/api/login', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: email.value, password: password.value })
-    });
-    if (res.ok) {
-      const data = await res.json();
-      token = data.access_token;
-      currentRole = decodeToken(token);
-      localStorage.setItem('token', token);
-      localStorage.setItem('role', currentRole);
-      showCRUD(currentRole);
-    } else showToast('Credenciales incorrectas', '#e53e3e');
+    try {
+      const res = await fetch('/api/login', {
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.value, password: password.value })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.access_token) {
+          token = data.access_token;
+          currentRole = decodeToken(token) || data.user?.role;
+          if (token && currentRole) {
+            // Limpiar cualquier espacio en blanco del token
+            token = token.trim();
+            localStorage.setItem('token', token);
+            localStorage.setItem('role', currentRole);
+            console.log('Token guardado:', token.substring(0, 30) + '...');
+            console.log('Rol:', currentRole);
+            // Esperar un momento antes de mostrar CRUD para asegurar que el token esté guardado
+            setTimeout(() => {
+              showCRUD(currentRole);
+            }, 50);
+          } else {
+            showToast('Error: Token inválido recibido', '#e53e3e');
+          }
+        } else {
+          showToast('Error: No se recibió token del servidor', '#e53e3e');
+        }
+      } else {
+        const errorData = await res.json().catch(() => ({ error: 'Error desconocido' }));
+        showToast(`Error: ${errorData.error || 'Credenciales incorrectas'}`, '#e53e3e');
+      }
+    } catch (error) {
+      console.error('Error en login:', error);
+      showToast('Error de conexión', '#e53e3e');
+    }
   });
 
   // REGISTRO
@@ -231,7 +276,19 @@
     crud.style.display = 'block';
     roleInfo.innerHTML = `<b>Rol:</b> ${role}`;
     toggleAdmin(role === 'admin');
-    loadHorarios(role);
+    
+    // Actualizar token desde localStorage antes de cargar datos
+    token = localStorage.getItem('token');
+    
+    // Esperar un momento antes de cargar datos para asegurar que el token esté disponible
+    setTimeout(() => {
+      // Asegurar que el token esté actualizado
+      token = localStorage.getItem('token');
+      if (role === 'admin') {
+        loadUsers(); // Solo para el registro de usuarios, no para asignar a horarios
+      }
+      loadHorarios(role);
+    }, 200);
   }
 
   function toggleAdmin(show) {
@@ -239,40 +296,195 @@
     document.getElementById('createSection').style.display = show ? 'block' : 'none';
   }
 
+  let usersList = [];
+
+  async function loadUsers() {
+    // Obtener token actualizado desde localStorage
+    const currentToken = localStorage.getItem('token');
+    if (!currentToken || currentToken === 'null' || currentToken.trim() === '') {
+      console.warn('No hay token disponible para cargar usuarios');
+      return;
+    }
+    const cleanToken = currentToken.trim();
+    console.log('Cargando usuarios con token:', cleanToken.substring(0, 30) + '...');
+    try {
+      const res = await fetch('/api/users', { 
+        headers: { 
+          'Authorization': `Bearer ${cleanToken}`,
+          'Content-Type': 'application/json'
+        } 
+      });
+      if (res.ok) {
+        usersList = await res.json();
+        const userSelect = document.getElementById('userSelect');
+        if (userSelect) {
+          userSelect.innerHTML = '<option value="">Seleccionar Usuario (Opcional)</option>' +
+            usersList.map(u => `<option value="${u.id}">${u.email} (${u.role})</option>`).join('');
+        }
+      } else {
+        const errorData = await res.json().catch(() => ({ error: 'Error desconocido' }));
+        console.error('Error cargando usuarios:', res.status, errorData);
+        // No recargar inmediatamente, solo mostrar error en consola
+        // Solo recargar si es un error persistente después de varios intentos
+        if (res.status === 401 || res.status === 422) {
+          console.warn('Token puede ser inválido, pero no recargando automáticamente');
+          // Mostrar mensaje pero no recargar inmediatamente
+          showToast('Error al cargar usuarios. Verifica tu sesión.', '#e53e3e');
+        }
+      }
+    } catch (error) {
+      console.error('Error cargando usuarios:', error);
+      // No recargar por errores de red
+    }
+  }
+
   async function loadHorarios(role) {
-    const res = await fetch(apiBase, { headers: { Authorization: `Bearer ${token}` } });
-    const data = await res.json();
-    const tbody = document.querySelector('#horariosTable tbody');
-    tbody.innerHTML = data.map(h => `
-      <tr>
-        <td>${h.id}</td><td>${h.dia}</td><td>${h.hora_inicio}</td>
-        <td>${h.hora_fin}</td><td>${h.materia}</td><td>${h.profesor}</td>
-        ${role === 'admin' ? `<td><button class="btn-secondary" onclick="deleteHorario(${h.id})">🗑️</button></td>` : ''}
-      </tr>`).join('');
+    // Obtener token actualizado desde localStorage
+    const currentToken = localStorage.getItem('token');
+    if (!currentToken || currentToken === 'null' || currentToken.trim() === '') {
+      console.warn('No hay token disponible para cargar horarios');
+      const tbody = document.querySelector('#horariosTable tbody');
+      if (tbody) {
+        tbody.innerHTML = '<tr><td colspan="7">No hay sesión activa</td></tr>';
+      }
+      return;
+    }
+    const cleanToken = currentToken.trim();
+    console.log('Cargando horarios con token:', cleanToken.substring(0, 30) + '...');
+    try {
+      const res = await fetch(apiBase, { 
+        headers: { 
+          'Authorization': `Bearer ${cleanToken}`,
+          'Content-Type': 'application/json'
+        } 
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const tbody = document.querySelector('#horariosTable tbody');
+        if (tbody) {
+          tbody.innerHTML = data.map(h => {
+            return `
+            <tr>
+              <td>${h.id}</td><td>${h.dia}</td><td>${h.hora_inicio}</td>
+              <td>${h.hora_fin}</td><td>${h.materia}</td><td>${h.docente}</td><td>${h.salon || ''}</td>
+              ${role === 'admin' ? `<td><button class="btn-secondary" onclick="deleteHorario(${h.id})">🗑️</button></td>` : ''}
+            </tr>`;
+          }).join('');
+        }
+      } else {
+        const errorData = await res.json().catch(() => ({ error: 'Error desconocido' }));
+        console.error('Error cargando horarios:', res.status, errorData);
+        const tbody = document.querySelector('#horariosTable tbody');
+        if (tbody) {
+          if (res.status === 401 || res.status === 422) {
+            // Token inválido o expirado - mostrar mensaje pero no recargar inmediatamente
+            tbody.innerHTML = '<tr><td colspan="7">Error de autenticación. Por favor, recarga la página.</td></tr>';
+            console.warn('Token inválido detectado, pero no recargando automáticamente');
+          } else {
+            tbody.innerHTML = '<tr><td colspan="7">Error al cargar horarios</td></tr>';
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error cargando horarios:', error);
+      const tbody = document.querySelector('#horariosTable tbody');
+      if (tbody) {
+        tbody.innerHTML = '<tr><td colspan="7">Error de conexión</td></tr>';
+      }
+    }
   }
 
   createForm.addEventListener('submit', async e => {
     e.preventDefault();
+    
+    // Obtener token actualizado desde localStorage
+    const currentToken = localStorage.getItem('token');
+    if (!currentToken || currentToken === 'null' || currentToken.trim() === '') {
+      showToast('Error: No hay sesión activa. Por favor, inicia sesión nuevamente.', '#e53e3e');
+      localStorage.clear();
+      location.reload();
+      return;
+    }
+    
     const horario = {
-      dia: dia.value, hora_inicio: hora_inicio.value,
-      hora_fin: hora_fin.value, materia: materia.value, profesor: profesor.value
+      dia: dia.value, 
+      hora_inicio: hora_inicio.value,
+      hora_fin: hora_fin.value, 
+      materia: materia.value, 
+      docente: docente.value, 
+      salon: salon.value
     };
-    const res = await fetch(apiBase, {
+    
+    console.log('Enviando horario:', horario); // Debug
+    console.log('Token usado:', currentToken.substring(0, 20) + '...'); // Debug
+    
+    try {
+      const res = await fetch(apiBase, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json', 
+          'Authorization': `Bearer ${currentToken}` 
+        },
+        body: JSON.stringify(horario)
+      });
+      
+      const responseData = await res.json().catch(() => ({ error: 'Error desconocido' }));
+      
+      if (res.ok) {
+        showToast('✅ Horario agregado correctamente', '#38a169');
+        e.target.reset();
+        loadHorarios(currentRole);
+      } else {
+        console.error('Error del servidor:', res.status, responseData);
+        if (res.status === 401 || res.status === 422) {
+          showToast('Sesión expirada. Por favor, inicia sesión nuevamente.', '#e53e3e');
+          // No recargar automáticamente, dejar que el usuario decida
+          console.warn('Token expirado o inválido');
+        } else {
+          showToast(`Error: ${responseData.error || 'Error al agregar horario'}`, '#e53e3e');
+        }
+      }
+    } catch (error) {
+      console.error('Error de red:', error);
+      showToast('Error de conexión al servidor', '#e53e3e');
+    }
+  });
+
+  // Registrar usuario desde admin
+  document.getElementById('registerUserForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const currentToken = localStorage.getItem('token');
+    const res = await fetch('/api/registry', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify(horario)
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${currentToken}`
+      },
+      body: JSON.stringify({
+        email: newUserEmail.value,
+        password: newUserPassword.value,
+        role: 'user'
+      })
     });
     if (res.ok) {
-      showToast('✅ Horario agregado correctamente', '#38a169');
+      showToast('✅ Usuario registrado correctamente', '#38a169');
       e.target.reset();
-      loadHorarios(currentRole);
-    } else showToast('Error al agregar horario', '#e53e3e');
+      loadUsers();
+    } else {
+      const error = await res.json();
+      showToast(`Error: ${error.error || 'Error al registrar usuario'}`, '#e53e3e');
+    }
   });
 
   async function deleteHorario(id) {
     if (!confirm('¿Eliminar este horario?')) return;
+    const currentToken = localStorage.getItem('token');
     const res = await fetch(`${apiBase}/${id}`, {
-      method: 'DELETE', headers: { Authorization: `Bearer ${token}` }
+      method: 'DELETE', 
+      headers: { 
+        'Authorization': `Bearer ${currentToken}`,
+        'Content-Type': 'application/json'
+      }
     });
     showToast(res.ok ? 'Horario eliminado' : 'Error al eliminar', res.ok ? '#38a169' : '#e53e3e');
     loadHorarios(currentRole);

@@ -17,9 +17,8 @@ from flask_jwt_extended.exceptions import NoAuthorizationError
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Inicializar blueprint y servicio
+# Inicializar blueprint
 user_bp = Blueprint("users", __name__)
-service = UserService(next(get_db_session()))
 
 # Lista para almacenar tokens invalidados (logout)
 blacklist = set()
@@ -28,12 +27,40 @@ blacklist = set()
 # 🔐 MANEJO DE ERRORES JWT
 # ============================================================
 def register_jwt_error_handlers(app):
+    from flask_jwt_extended.exceptions import JWTDecodeError, InvalidHeaderError, WrongTokenError
+    
     @app.errorhandler(NoAuthorizationError)
     def handle_no_auth_error(e):
         logger.warning("Intento de acceso sin autenticación JWT.")
         return jsonify({
             'error': 'No autenticado. Debe enviar un token JWT válido en el header Authorization.'
         }), 401
+
+    @app.errorhandler(422)
+    def handle_unprocessable_entity(e):
+        error_msg = str(e) if e else 'Error desconocido'
+        logger.warning(f"Error 422: {error_msg}")
+        # Flask-JWT-Extended devuelve 422 para errores de token
+        # Log más detallado para debugging
+        import traceback
+        logger.debug(f"Traceback del error 422: {traceback.format_exc()}")
+        return jsonify({
+            'error': f'Token JWT inválido o mal formado: {error_msg}. Por favor, inicia sesión nuevamente.'
+        }), 422
+
+    @app.errorhandler(JWTDecodeError)
+    def handle_jwt_decode_error(e):
+        logger.warning(f"Error decodificando JWT: {str(e)}")
+        return jsonify({
+            'error': 'Token JWT inválido. Por favor, inicia sesión nuevamente.'
+        }), 422
+
+    @app.errorhandler(InvalidHeaderError)
+    def handle_invalid_header_error(e):
+        logger.warning(f"Error en header JWT: {str(e)}")
+        return jsonify({
+            'error': 'Header de autorización inválido. Formato esperado: Bearer <token>'
+        }), 422
 
     @app.errorhandler(403)
     def forbidden(e):
@@ -49,11 +76,18 @@ def role_required(required_role):
         @wraps(f)
         def decorated_function(*args, **kwargs):
             current_user_id = get_jwt_identity()
-            user = service.obtener_usuario_por_id(current_user_id)
-            if not user or user.role != required_role:
-                logger.warning(f"Acceso denegado: usuario {current_user_id} sin rol {required_role}")
-                return jsonify({'error': 'Rol requerido o permisos insuficientes'}), 403
-            return f(*args, **kwargs)
+            # Convertir a int si viene como string
+            user_id_int = int(current_user_id) if isinstance(current_user_id, str) else current_user_id
+            db = next(get_db_session())
+            service = UserService(db)
+            try:
+                user = service.obtener_usuario_por_id(user_id_int)
+                if not user or user.role != required_role:
+                    logger.warning(f"Acceso denegado: usuario {current_user_id} sin rol {required_role}")
+                    return jsonify({'error': 'Rol requerido o permisos insuficientes'}), 403
+                return f(*args, **kwargs)
+            finally:
+                db.close()
         return decorated_function
     return decorator
 
@@ -70,31 +104,38 @@ def login():
     if not email or not password:
         return jsonify({"error": "El email y la contraseña son obligatorios."}), 400
 
-    user = service.autenticar_usuario(email, password)
-    if not user:
-        logger.warning(f"Intento de login fallido para {email}")
-        return jsonify({"error": "Credenciales inválidas"}), 401
+    db = next(get_db_session())
+    service = UserService(db)
+    try:
+        user = service.autenticar_usuario(email, password)
+        if not user:
+            logger.warning(f"Intento de login fallido para {email}")
+            return jsonify({"error": "Credenciales inválidas"}), 401
 
-    access_token = create_access_token(identity=user.id, additional_claims={"role": user.role})
-    refresh_token = create_refresh_token(identity=user.id)
+        # Flask-JWT-Extended requiere que identity sea una cadena
+        access_token = create_access_token(identity=str(user.id), additional_claims={"role": user.role})
+        refresh_token = create_refresh_token(identity=str(user.id))
 
-    logger.info(f"Usuario autenticado correctamente: {email}")
-    return jsonify({
-        "access_token": access_token,
-        "refresh_token": refresh_token,
-        "user": {
-            "id": user.id,
-            "email": user.email,
-            "role": user.role
-        }
-    }), 200
+        logger.info(f"Usuario autenticado correctamente: {email}")
+        return jsonify({
+            "access_token": access_token,
+            "refresh_token": refresh_token,
+            "user": {
+                "id": user.id,
+                "email": user.email,
+                "role": user.role
+            }
+        }), 200
+    finally:
+        db.close()
 
 
 @user_bp.route("/refresh", methods=["POST"])
 @jwt_required(refresh=True)
 def refresh():
     current_user = get_jwt_identity()
-    new_access_token = create_access_token(identity=current_user)
+    # Asegurar que identity sea string
+    new_access_token = create_access_token(identity=str(current_user))
     return jsonify({"access_token": new_access_token}), 200
 
 
@@ -120,7 +161,29 @@ def register():
     if not email or not password:
         return jsonify({"error": "El email y la contraseña son obligatorios."}), 400
 
+    # Verificar si hay un token de admin (opcional)
+    is_admin = False
     try:
+        from flask_jwt_extended import verify_jwt_in_request, get_jwt
+        verify_jwt_in_request(optional=True)
+        claims = get_jwt()
+        if claims and claims.get("role") == "admin":
+            is_admin = True
+            # Si es admin, solo puede crear usuarios normales
+            role = "user"
+    except:
+        pass
+
+    db = next(get_db_session())
+    service = UserService(db)
+    try:
+        # Si no es admin y intenta crear admin, rechazar
+        if not is_admin and role == "admin":
+            existing_admin = service.obtener_usuario_por_id(1)  # Verificar si existe admin
+            admin_users = [u for u in service.listar_usuarios() if u.role == "admin"]
+            if admin_users:
+                return jsonify({"error": "No se puede crear un administrador. Solo puede haber uno."}), 403
+        
         new_user = service.crear_usuario(email, password, role)
         return jsonify({
             "id": new_user.id,
@@ -129,50 +192,77 @@ def register():
         }), 201
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
+    finally:
+        db.close()
 
 
 @user_bp.route("/users", methods=["GET"])
 @jwt_required()
 def list_users():
-    users = service.listar_usuarios()
-    return jsonify([
-        {"id": u.id, "email": u.email, "role": u.role}
-        for u in users
-    ]), 200
+    # Log del header de autorización para debugging
+    auth_header = request.headers.get('Authorization', 'No header')
+    logger.info(f"Authorization header recibido en /users: {auth_header[:50] if len(auth_header) > 50 else auth_header}...")
+    db = next(get_db_session())
+    service = UserService(db)
+    try:
+        users = service.listar_usuarios()
+        return jsonify([
+            {"id": u.id, "email": u.email, "role": u.role}
+            for u in users
+        ]), 200
+    finally:
+        db.close()
 
 
 @user_bp.route("/users/<int:user_id>", methods=["GET"])
 @jwt_required()
 def get_user(user_id):
-    user = service.obtener_usuario_por_id(user_id)
-    if not user:
-        return jsonify({"error": "Usuario no encontrado"}), 404
-    return jsonify({
-        "id": user.id,
-        "email": user.email,
-        "role": user.role
-    }), 200
+    db = next(get_db_session())
+    service = UserService(db)
+    try:
+        user = service.obtener_usuario_por_id(user_id)
+        if not user:
+            return jsonify({"error": "Usuario no encontrado"}), 404
+        return jsonify({
+            "id": user.id,
+            "email": user.email,
+            "role": user.role
+        }), 200
+    finally:
+        db.close()
 
 
 @user_bp.route("/users/<int:user_id>", methods=["PUT"])
 @role_required("admin")
 def update_user(user_id):
     data = request.get_json()
-    updated = service.actualizar_usuario(
-        user_id,
-        email=data.get("email"),
-        password=data.get("password"),
-        role=data.get("role")
-    )
-    if updated:
-        return jsonify({"message": "Usuario actualizado correctamente"}), 200
-    return jsonify({"error": "Usuario no encontrado"}), 404
+    db = next(get_db_session())
+    service = UserService(db)
+    try:
+        updated = service.actualizar_usuario(
+            user_id,
+            email=data.get("email"),
+            password=data.get("password"),
+            role=data.get("role")
+        )
+        if updated:
+            return jsonify({"message": "Usuario actualizado correctamente"}), 200
+        return jsonify({"error": "Usuario no encontrado"}), 404
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    finally:
+        db.close()
 
 
 @user_bp.route("/users/<int:user_id>", methods=["DELETE"])
 @role_required("admin")
 def delete_user(user_id):
-    deleted = service.eliminar_usuario(user_id)
-    if deleted:
-        return jsonify({"message": "Usuario eliminado correctamente"}), 200
-    return jsonify({"error": "Usuario no encontrado"}), 404
+    db = next(get_db_session())
+    service = UserService(db)
+    try:
+        deleted = service.eliminar_usuario(user_id)
+        if deleted:
+            return jsonify({"message": "Usuario eliminado correctamente"}), 200
+        return jsonify({"error": "Usuario no encontrado"}), 404
+    finally:
+        db.close()

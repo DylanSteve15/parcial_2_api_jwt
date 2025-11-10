@@ -1,6 +1,7 @@
 #models/horario_model
 import logging
-from sqlalchemy import Column, Integer, String, Time, Date
+from sqlalchemy import Column, Integer, String, Time, Date, ForeignKey
+from sqlalchemy.orm import relationship
 from models.db import Base
 
 # Configuración de logging
@@ -20,18 +21,20 @@ class Horario(Base):
     hora_inicio = Column(Time, nullable=False)
     hora_fin = Column(Time, nullable=False)
     salon = Column(String(100), nullable=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=True)
 
-    def __init__(self, materia, docente, dia, hora_inicio, hora_fin, salon=None):
+    def __init__(self, materia, docente, dia, hora_inicio, hora_fin, salon=None, user_id=None):
         self.materia = materia
         self.docente = docente
         self.dia = dia
         self.hora_inicio = hora_inicio
         self.hora_fin = hora_fin
         self.salon = salon
+        self.user_id = user_id
 
     def __repr__(self):
         return (
             f"<Horario(id={self.id}, materia='{self.materia}', docente='{self.docente}', "
             f"dia='{self.dia}', hora_inicio='{self.hora_inicio}', hora_fin='{self.hora_fin}', "
-            f"salon='{self.salon}')>"
+            f"salon='{self.salon}', user_id={self.user_id})>"
         )

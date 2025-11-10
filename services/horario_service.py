@@ -20,14 +20,14 @@ class HorarioService:
         logger.info(f"Obteniendo horario por ID: {horario_id}")
         return self.repository.get_horario_by_id(horario_id)
 
-    def crear_horario(self, materia: str, dia: str, hora_inicio: str, hora_fin: str, aula: str):
+    def crear_horario(self, materia: str, docente: str, dia: str, hora_inicio: str, hora_fin: str, salon: str, user_id: int = None):
         logger.info(f"Creando horario para la materia: {materia}")
-        return self.repository.create_horario(materia, dia, hora_inicio, hora_fin, aula)
+        return self.repository.create_horario(materia, docente, dia, hora_inicio, hora_fin, salon, user_id)
 
-    def actualizar_horario(self, horario_id: int, materia: str = None, dia: str = None, 
-                           hora_inicio: str = None, hora_fin: str = None, aula: str = None):
+    def actualizar_horario(self, horario_id: int, materia: str = None, docente: str = None, dia: str = None, 
+                           hora_inicio: str = None, hora_fin: str = None, salon: str = None, user_id: int = None):
         logger.info(f"Actualizando horario: {horario_id}")
-        return self.repository.update_horario(horario_id, materia, dia, hora_inicio, hora_fin, aula)
+        return self.repository.update_horario(horario_id, materia, docente, dia, hora_inicio, hora_fin, salon, user_id)
 
     def eliminar_horario(self, horario_id: int):
         logger.info(f"Eliminando horario: {horario_id}")
